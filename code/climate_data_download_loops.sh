@@ -12,7 +12,8 @@
 
 module purge
 
-cd $SLURM_SUBMIT_DIR
+cd ~/global_suicide_dummy
+
 PYTHON_SCRIPT="./code/climate_data_download_loops.py"
 LOG_FILE="./slurm_logs/$SLURM_JOB_ID.log"
 

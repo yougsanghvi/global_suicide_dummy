@@ -8,7 +8,7 @@ data_dir = "/global/scratch/users/yougsanghvi/"
 
 print("before for loop")
 
-for year in range(1980, 2021):
+for year in range(2016, 2021):
 
     print("in for loop, year: ", year)
 
