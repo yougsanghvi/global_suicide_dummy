@@ -5,10 +5,11 @@ import os
 
 dataset = "reanalysis-era5-single-levels"
 data_dir = "/global/scratch/users/yougsanghvi/"
+data_folder = os.path.join(data_dir, "era5_hourly_by_year")
 
 print("before for loop")
 
-for year in range(2020, 2021):
+for year in range(1979, 2021):
 
     print("in for loop, year: ", year)
 
@@ -94,7 +95,7 @@ for year in range(2020, 2021):
     }
 
     fn = f"era5_data_{year}.grib"
-    fp = os.path.join(data_dir, fn)
+    fp = os.path.join(data_folder, fn)
 
     client = cdsapi.Client()
 

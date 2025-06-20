@@ -14,6 +14,8 @@ install_if_missing("sf")
 install_if_missing("stars")
 install_if_missing("raster")
 install_if_missing("sp")
+install_if_missing("dplyr")
+
 
 # Install stagg from GitHub if it's not already installed
 if (!requireNamespace("stagg", quietly = TRUE)) {
@@ -25,15 +27,15 @@ library(stagg)
 # Install ncdf4 with specific configure arguments if needed for your system
 # This is crucial for reading NetCDF files like ERA5 on some HPC systems.
 # IMPORTANT: You MUST run 'module load netcdf-c/4.9.2' in your terminal BEFORE running this R script.
-if (!requireNamespace("ncdf4", quietly = TRUE)) {
-    nc_config_path <- "/global/software/rocky-8.x86_64/gcc/linux-rocky8-x86_64/gcc-11.4.0/netcdf-c-4.9.2-4au53ukmrllskvcwqexja4lp44lxt6fo/bin/nc-config"
-    install_if_missing(
-      "ncdf4",
-      configure.args = paste0("--with-nc-config=", nc_config_path)
-    )
-} else {
-    library(ncdf4)
-}
+#if (!requireNamespace("ncdf4", quietly = TRUE)) {
+#    nc_config_path <- "/global/software/rocky-8.x86_64/gcc/linux-rocky8-x86_64/gcc-11.4.0/netcdf-c-4.9.2-4au53ukmrllskvcwqexja4lp44lxt6fo/bin/nc-config"
+#    install_if_missing(
+#      "ncdf4",
+#      configure.args = paste0("--with-nc-config=", nc_config_path)
+#    )
+#} else {
+#    library(ncdf4)
+#}
 
 
 # --- Setting working directories ---
@@ -128,31 +130,31 @@ ggsave(
 
 # ----- STEP 2 -------
 
-gdnat_nc_filename <- "gdnat_stagg_1979.nc"
-nc1_path <- file.path(dir, gdnat_nc_filename)
-nc_data <- nc_open(nc1_path)
+dir <- "/global/scratch/users/yougsanghvi"
+gdnat_tiff_filename <- "gdnat_1979.tif"
+tiff_path <- file.path(dir, gdnat_tiff_filename)
 
-#sf::gdal_utils("info", nc1_path)
+r <- terra::rast(tiff_path)
+r_shifted <- rotate(r)
 
-print("opening and cropping nc file")
-terra::rast(nc1_path, drivers = "netcdf")
-
-
-
- |>
-  terra::crop(usa_counties)  # Assuming usa_counties is already defined
+r_crop <- crop(r_shifted, usa_counties)
+r_crop_celsius <- r_crop - 273.15
 
 
 
 
-# Convert from K to C
-cat("Converting from K to C\n")
-clim_raster_tmp <- clim_raster_tmp - 273.15
+
+
+# Plot the first band and save it as a PNG
+#png("raster_plot.png", width = 1000, height = 600)
+#plot(r_crop_celsius[[1]], main = "First Time Slice", col = terrain.colors(100))
+#dev.off()
+
 
 # Run staggregate_polynomial
 cat("Running stagg::staggregate_polynomial\n")
 temp_out <- stagg::staggregate_polynomial(
-  data = clim_raster_tmp,
+  data = r_crop_celsius,
   overlay_weights = county_weights,
   start_date = paste0(1979, "-01-01 00:00:00"),  # match file year
   daily_agg = "none",
@@ -161,63 +163,6 @@ temp_out <- stagg::staggregate_polynomial(
 )
 
 
-
-# Step 2 
-
-gdnat_nc1_filename <- "gdnat_squeezed_1979.nc"
-nc1_path <- file.path(dir, gdnat_nc1_filename)
-
-# loading in nc1
-
-variable_name <- "tas"
-
-nc_data <- nc_open(nc1_path)
-
-data_array <- ncvar_get(nc_data, variable_name)
-lon_vals <- ncvar_get(nc_data, "lon")
-lat_vals <- ncvar_get(nc_data, "lat")
-time_vals_raw <- ncvar_get(nc_data, "time")
-
-time_units <- ncatt_get(nc_data, "time", "units")$value
-time_origin <- sub(".*since ", "", time_units)
-time_dates <- as.POSIXct(time_vals_raw, origin = time_origin, tz = "GMT")
-
-nc_close(nc_data)
-
-# Assuming data_array dimensions are [lon, lat, time, model] in R
-# based on common ncdf4 behavior and your xarray output.
-# This selects the first (and only) slice of the 'model' dimension.
-clim_data_final <- data_array
-
-ext <- terra::ext(min(lon_vals), max(lon_vals), min(lat_vals), max(lat_vals))
-
-clim_raster_tmp <- terra::rast(clim_data_final, ext = ext, crs = "EPSG:4326")
-
-terra::time(clim_raster_tmp) <- time_dates
-
-print(clim_raster_tmp)
-
-# Rotate the raster's longitude range from 0-360 to -180-180
-clim_raster_rotated <- terra::rotate(clim_raster_tmp)
-
-clim_raster_cropped <- terra::crop(clim_raster_rotated, usa_counties)
-
-# convert from K to C
-cat("Converting from K to C\n")
-clim_raster_tmp <- clim_raster_tmp - 273.15
-
-poly_order <- 4
-first_date <- min(terra::time(clim_raster_cropped))
-time_interval <- '1 day'
-temp_out <- stagg::staggregate_polynomial(
-  data = clim_raster_cropped,
-  overlay_weights = county_weights,
-  daily_agg = 'none',
-  time_agg = 'month',
-  degree = poly_order, 
-  start_date = first_date, # <--- Add this
-  time_interval = time_interval_hours
-)
 
 
 # ------- Testing -------- #
@@ -237,7 +182,7 @@ plotting_data <- usa_counties_with_data %>%
 
 # Create the plot
 # Replace 'order_1' with the specific polynomial term you want to visualize (e.g., 'order_2', 'order_3', 'order_4')
-ggplot(data = plotting_data) +
+test_plot <- ggplot(data = plotting_data) +
   geom_sf(aes(fill = order_1), color = NA) + # 'aes(fill = ...)' colors the polygons
   scale_fill_viridis_c() + # A good continuous color scale
   labs(
@@ -245,3 +190,13 @@ ggplot(data = plotting_data) +
     fill = "TAS Value"
   ) +
   theme_minimal()
+
+ggsave(filename = "test_plot.png", plot = test_plot)
+
+
+# --------------------------- exploring the data -------------
+
+df_filtered <- temp_out %>%
+  filter(is.na(year) | is.na(month))
+
+# there are 5 counties with all NA values - should be explored 
