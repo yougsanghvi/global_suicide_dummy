@@ -29,11 +29,16 @@ results_file_path <- file.path(dir_path, results_folder, results_file_name)
 regression_beta_fn <- "regression_coefficients_USA_poly4_lag11.csv"
 regression_beta_fp <- file.path(dir_path, regression_beta_fn)
 
+era5_folderpath <- "tavg"
+era5_filename <- "temp_polynomial_Adm0_USA_ERA5_pop_weights"
+era5_filepath <- file.path(dir_path, era5_folderpath, era5_filename)
+
 # Load the required datasets
 stagg_results <- read.csv(results_file_path)
 regression_betas <- read.csv(regression_beta_fp)
+era5_results <- read.csv(era5_filepath)
 
-# ----- Running NA checks
+# ----- Running NA checks # ------------
 
 stagg_results_na <- stagg_results[!complete.cases(stagg_results), ]
 # NAs found only in 2 counties: [1] "USA.10.44_1" "USA.24.39_1" - lake of the woods and monroe county 
@@ -42,7 +47,8 @@ stagg_results_na <- stagg_results[!complete.cases(stagg_results), ]
 # !!! MUST be revisited 
 
 stagg_results_na_drop <- stagg_results[complete.cases(stagg_results), ]
-# ------------
+
+# ----- Predicting for GDNat -------#
 
 # Assume stagg_results has year, month, poly_id, order_1..order_4
 
@@ -91,6 +97,42 @@ X <- stagg_results_lagged_clean[, names(coef_vector)] |> as.matrix()
 # Compute predicted y_hat as matrix multiplication
 stagg_results_lagged_clean$y_hat <- as.vector(X %*% coef_vector)
 
+# ----- Predicting for ERA5 -------#
+
+era5_results_lagged <- stagg_results_na_drop %>%
+  mutate(across(order_1:order_4, ~ . / days_in_month, .names = "{.col}_avg")) %>%
+  arrange(poly_id, date) %>%
+  group_by(poly_id) %>%
+  mutate(across(ends_with("_avg"), 
+                list(`0` = ~., 
+                     `1` = ~lag(., 1), `2` = ~lag(., 2), `3` = ~lag(., 3),
+                     `4` = ~lag(., 4), `5` = ~lag(., 5), `6` = ~lag(., 6),
+                     `7` = ~lag(., 7), `8` = ~lag(., 8), `9` = ~lag(., 9),
+                     `10` = ~lag(., 10), `11` = ~lag(., 11)),
+                .names = "{.col}_lag{.fn}")) %>%
+  ungroup()
+
+rename_vars <- expand.grid(order = 1:4, lag = 0:11) %>%
+  mutate(old = paste0("order_", order, "_avg_lag", lag),
+        new = paste0("tavg_poly", order, "_l", lag))
+
+names(stagg_results_lagged)[match(rename_vars$old, names(stagg_results_lagged))] <- rename_vars$new
+
+# removing first 11 dates 
+stagg_results_lagged_clean <- stagg_results_lagged %>%
+  arrange(poly_id, date) %>%
+  group_by(poly_id) %>%
+  slice(-(1:11)) %>%
+  ungroup()
+
+# Create named vector of regression betas using 'term' column
+coef_vector <- setNames(regression_betas$beta, regression_betas$term)
+
+# Extract predictor matrix from dataset using variable names from coef_vector
+X <- stagg_results_lagged_clean[, names(coef_vector)] |> as.matrix()
+
+# Compute predicted y_hat as matrix multiplication
+stagg_results_lagged_clean$y_hat <- as.vector(X %*% coef_vector)
 
 # ----- Sense checks - plotting -------#
 
