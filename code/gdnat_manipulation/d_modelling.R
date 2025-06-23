@@ -18,6 +18,8 @@ install_if_missing <- function(pkg, ...) {
 install_if_missing("dplyr")
 install_if_missing("lubridate")
 install_if_missing("fixest")
+install_if_missing("haven")
+install_if_missing("readstata13")
 
 # Set file paths 
 dir_path <- "/global/scratch/users/yougsanghvi"
@@ -29,17 +31,26 @@ results_file_path <- file.path(dir_path, results_folder, results_file_name)
 regression_beta_fn <- "regression_coefficients_USA_poly4_lag11.csv"
 regression_beta_fp <- file.path(dir_path, regression_beta_fn)
 
-era5_folderpath <- "tavg"
-era5_filename <- "temp_polynomial_Adm0_USA_ERA5_pop_weights"
-era5_filepath <- file.path(dir_path, era5_folderpath, era5_filename)
+era5_filename <- "USA_adm2_1968_2004_monthly.dta"
+era5_filepath <- file.path(dir_path, era5_filename)
 
 # Load the required datasets
 stagg_results <- read.csv(results_file_path)
 regression_betas <- read.csv(regression_beta_fp)
-era5_results <- read.csv(era5_filepath)
+era5_results <- readstata13::read.dta13(era5_filepath)
+
+
+
+
+
+
+
+
+
 
 # ----- Running NA checks # ------------
 
+# 1. Checking for GDNAt Data
 stagg_results_na <- stagg_results[!complete.cases(stagg_results), ]
 # NAs found only in 2 counties: [1] "USA.10.44_1" "USA.24.39_1" - lake of the woods and monroe county 
 
@@ -47,6 +58,16 @@ stagg_results_na <- stagg_results[!complete.cases(stagg_results), ]
 # !!! MUST be revisited 
 
 stagg_results_na_drop <- stagg_results[complete.cases(stagg_results), ]
+
+#2. Checking for ERA5 Data
+era5_results_na <- era5_results[!complete.cases(era5_results), ]
+
+
+# dropping these *for now*
+# !!! MUST be revisited 
+
+stagg_results_na_drop <- stagg_results[complete.cases(stagg_results), ]
+
 
 # ----- Predicting for GDNat -------#
 
