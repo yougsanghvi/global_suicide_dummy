@@ -1,3 +1,5 @@
+# !!! this code is not complete so be cautious while running it
+
 # Please load r-spatial using 'module-load r-spatial' before running this code
 
 # ------ 1. Library Management ------
@@ -38,9 +40,9 @@ dir <- "/global/scratch/users/yougsanghvi"
 dir_tiff <- file.path(dir, "gdnat_tiff_files_by_yr")
 
 # Define paths for world county shapefile.
-world_county_dir <- file.path(dir, "gadm36_levels_shp")
-world_county_filename <- "gadm36_2.shp"
-world_county_path <- file.path(world_county_dir, world_county_filename)
+usa_county_dir <- file.path(dir, "shapefiles")
+usa_county_filename <- "tl_2016_us_county_mortality.shp"
+usa_county_path <- file.path(usa_county_dir, usa_county_filename)
 
 # Define the generic filename pattern for yearly NetCDF/TIFF files.
 # The `{year}` placeholder will be replaced in the loop.
@@ -55,26 +57,25 @@ if (!dir.exists(output_dir)) {
 
 # Define the range of years to process
 start_year <- 1979
-end_year <- 2020
+end_year <- 2004
 
 # DO NOT CHANGE -- no overwrite functionality can be added soon...
-# ... but not already present 
+# ... but not already present
 overwrite <- TRUE
+
+# Set weighting scheme
+# TRUE: add population secondary weights, FALSE: keep only area weighted
+
+# !!! add functionality to change file names based on this
+pop_weight <- TRUE
 
 # ------ 3. Polygon Data Preparation (USA Counties) ------
 
 # Read the world county shapefile into an sf object.
-world_counties <- st_read(world_county_path, quiet = TRUE)
-ext(world_counties)
-
-# Filter the `world_counties` data to include only United States counties.
-usa_counties <- world_counties %>%
-  dplyr::filter(
-    NAME_0 %in% c("United States of America", "USA", "United States")
-  )
+usa_counties <- st_read(usa_county_path, quiet = TRUE)
+ext(usa_counties)
 
 # Ensure the Coordinate Reference System (CRS) is WGS84 (EPSG:4326) for consistency.
-# This is crucial for correct spatial operations.
 
 usa_counties <- sf::st_transform(usa_counties, 4326)
 
@@ -85,23 +86,32 @@ usa_counties <- st_make_valid(usa_counties)
 
 # Crop the `usa_counties` data to the continental US bounding box.
 # This helps reduce processing time and avoids issues with non-contiguous states like Alaska and Hawaii.
-bbox_poly <- st_as_sfc(st_bbox(
-  c(xmin = -140, ymin = 15, xmax = -50, ymax = 50),
-  crs = st_crs(usa_counties)
-))
-usa_counties <- st_filter(usa_counties, bbox_poly)
-
+# bbox_poly <- st_as_sfc(st_bbox(
+#  c(xmin = -140, ymin = 15, xmax = -50, ymax = 50),
+#  crs = st_crs(usa_counties)
+# ))
+# usa_counties <- st_filter(usa_counties, bbox_poly)
 
 # ------ 4. Calculate Overlay Weights ------
 
 # This function calculates how much each grid cell overlaps with each polygon,
 # optionally weighting by a secondary raster (e.g., population density).
-county_weights <- overlay_weights(
-  polygons = usa_counties,
-  polygon_id_col = "GID_2",
-  grid = era5_grid #,
-  # secondary_weights = pop_world_2015_era5
-)
+# county_weights <- overlay_weights(
+#  polygons = usa_counties,
+#  polygon_id_col = "GID_2",
+#  grid = era5_grid,
+#  secondary_weights = pop_world_2015_era5
+# )
+
+if (pop_weight) {
+  county_weights <- stagg::overlay_weights(
+    usa_counties,
+    "GEOID",
+    secondary_weights = pop_world_2015_era5
+  )
+} else {
+  county_weights <- stagg::overlay_weights(usa_counties, "GEOID")
+}
 
 # ------ 5. Raster Data Preparation and Aggregation Across Years ------
 
@@ -155,7 +165,7 @@ for (year in start_year:end_year) {
       }
     )
     next # Skip to the next iteration if conditions met and existing data loaded
-  }
+  } # END OF IF STATEMENT
 
   # Read the raster data for the current year
   r <- terra::rast(current_tiff_path)
@@ -168,8 +178,6 @@ for (year in start_year:end_year) {
 
   # Convert temperature values from Kelvin to Celsius
   r_crop_celsius <- r_crop - 273.15
-
-
 
   # Run `stagg::staggregate_polynomial` for the current year's data.
   message(sprintf("  Running stagg::staggregate_polynomial for %d...", year))
@@ -198,20 +206,49 @@ for (year in start_year:end_year) {
 
   # Store the current year's aggregated data in the list for combined output
   all_years_aggregated_data[[as.character(year)]] <- temp_out
-}
+} # END OF FOR LOOP
 
 # Combine all yearly aggregated data into a single data frame
-# Assumes that the structure (column names and types) of temp_out is consistent across years.
-message("Combining all yearly aggregated data...")
-all_years_data_combined <- dplyr::bind_rows(all_years_aggregated_data)
 
-# Save the combined data for all years -- this code may not be working
-combined_output_filename <- file.path(output_dir, "gdnat_usa_agg_all_years.csv")
-write.csv(all_years_data_combined, combined_output_filename, row.names = FALSE)
+# List all aggregated CSV files in the output directory
+# !!! the below will have to be changed every time the file name changes
+# Make this an automatic change in the future by setting file names dynamically
+
+# List all yearly aggregated CSV files in the output directory.
+all_csv_files <- list.files(
+  path = output_dir,
+  pattern = "^gdnat_usa_agg_.*\\.csv$", # Matches files like "gdnat_usa_agg_YYYY.csv"
+  full.names = TRUE # Get full file paths
+)
+
+# Sort files chronologically for correct data order.
+all_csv_files <- sort(all_csv_files)
+
+# Read each CSV file into a list of data frames.
+list_of_dfs <- lapply(all_csv_files, read.csv, stringsAsFactors = FALSE)
+
+# Combine all data frames into a single data frame by row.
+combined_df <- do.call(rbind, list_of_dfs)
+
+# Define the full path for the final merged output file.
+output_filepath_all_years <- file.path(
+  output_dir,
+  "gdnat_usa_agg_all_years.csv"
+)
+
+# Save the combined data frame to a new CSV file.
+write.csv(combined_df, output_filepath_all_years, row.names = FALSE)
+
+# Display a confirmation message.
 message(sprintf(
-  "All years combined data saved to %s",
-  combined_output_filename
+  "All aggregated data merged and saved to: %s",
+  output_filepath_all_years
 ))
 
-# ------ Final Confirmation ------
-message("Script finished. Check the '", output_dir, "' directory for results.")
+# !!! this code currently outputs dupicated rows. 
+# this seems harmless and i am simply dropping duplicate ones
+# but this step needs to be done in analyses
+# Will need explore this issue soon
+
+# the file name also needs to be changed and the code reran 
+# currently it is merging in old files 
