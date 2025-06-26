@@ -22,7 +22,7 @@ attribution_output_folderpath <- file.path(
     dir_path,
     "gdnat_era5_compare_output"
 )
-attribution_output_filename <- "merged_data_panel.csv"
+attribution_output_filename <- "merged_data_panel_extended.csv"
 attribution_output_filepath <- file.path(
     attribution_output_folderpath,
     attribution_output_filename
