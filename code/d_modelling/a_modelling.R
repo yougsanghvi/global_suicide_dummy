@@ -236,6 +236,8 @@ merged_data_panel_clean <- full_join(
   )
 )
 
+# rename the order one averages to include era5 or gdnat 
+
 colSums(is.na(merged_data_panel_clean))
 
 
