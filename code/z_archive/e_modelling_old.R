@@ -41,6 +41,11 @@ era5_folderpath <- file.path("merged", "USA")
 era5_filename <- "USA_adm2_1968_2004_monthly.dta"
 era5_filepath <- file.path(dir_path, era5_folderpath, era5_filename)
 
+# era5 non merged file path
+era5_folderpath <- file.path("data", "climatedata", "USA")
+era5_filename <- "usa_area_era5_temp_average_1968_2004_polynomial_5_area_crop_weights.csv"
+era5_filepath <- file.path(dir_path, era5_folderpath, era5_filename)
+
 # Define paths for usa county shapefile
 usa_county_dir <- file.path(dir_path, "shapefiles")
 usa_county_filename <- "tl_2016_us_county_mortality.shp"
@@ -57,7 +62,7 @@ output_path <- file.path(dir_path, "gdnat_era5_compare_output")
 # Load the required datasets
 stagg_results <- read.csv(results_file_path)
 regression_betas <- read.csv(regression_beta_fp)
-era5_results <- readstata13::read.dta13(era5_filepath)
+era5_results <- read.csv(era5_filepath)
 usa_shapefile <- st_read(usa_county_path)
 geocode_file <- read.csv(geocode_filepath)
 
@@ -274,11 +279,25 @@ gdnat_final <- stagg_results_lagged_clean %>%
     NAME,
     NAMELSAD,
     ID_1,
-    ID_2
+    ID_2,
+    date,
+    order_1_avg
   )
 
 era5_final <- era5_results_lagged_clean %>%
-  select(-starts_with("tavg")) %>%
+  select(
+    year,
+    month,
+    num_of_suicide,
+    suiciderate,
+    adm2_id,
+    statename,
+    countyname,
+    tavg_poly1_aw,
+    year,
+    date,
+    y_hat_era5
+  ) %>%
   filter(year > 1979) # we only have gdnat data post 1979
 
 # Removing counties that are unmatched in both datasets, for now
@@ -292,7 +311,7 @@ gdnat_ids <- unique(gdnat_final$poly_id_int)
 era5_ids <- unique(era5_final$adm2_id)
 
 unmatched_gdnat <- gdnat_final %>%
-  anti_join(era5_final, by = c("poly_id_int" = "adm2_id")) 
+  anti_join(era5_final, by = c("poly_id_int" = "adm2_id"))
 
 unmatched_gdnat_ids_list <- unmatched_gdnat %>%
   distinct(poly_id_int) %>%
@@ -311,8 +330,8 @@ gdnat_final_filtered <- gdnat_final %>%
 era5_final_filtered <- era5_final %>%
   filter(!(adm2_id %in% unmatched_era5_ids_list))
 
-# full join causes issues which must be explored in the future 
-# only 50% of gdnat rows find a match in era5 
+# full join causes issues which must be explored in the future
+# only 50% of gdnat rows find a match in era5
 # there might be duplication issue
 
 merged_data_panel <- left_join(
