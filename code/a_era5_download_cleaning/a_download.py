@@ -9,7 +9,7 @@ data_folder = os.path.join(data_dir, "era5_hourly_by_year")
 
 print("before for loop")
 
-for year in range(1979, 2021):
+for year in range(2000, 2005):
 
     print("in for loop, year: ", year)
 

@@ -3,6 +3,7 @@
 # Please load r-spatial using 'module-load r-spatial' before running this code
 
 # ------ 1. Library Management ------
+# replace some of these with pacman
 
 #' Helper function to install and load CRAN packages if they are missing
 #'
@@ -25,6 +26,9 @@ install_if_missing("dplyr")
 install_if_missing("ggplot2") # For plotting results
 install_if_missing("terra") # For raster operations
 install_if_missing("crayon") # For printing colored messages in the console
+
+# for each
+#
 
 # Install `stagg` from GitHub if it's not already installed.
 # `remotes` is required to install packages directly from GitHub.
@@ -107,7 +111,7 @@ cat(crayon::magenta("Starting raster data processing and aggregation...\n"))
 all_years_aggregated_data <- list()
 
 # Loop through each year, process the corresponding raster, and aggregate
-for (year in start_year:end_year) {
+for (year in start_year:end_year) { # for each loop instead
   message(sprintf("Processing year: %d", year))
 
   # Construct the full path for the current year's TIFF file
