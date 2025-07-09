@@ -1,26 +1,11 @@
-# ERA5 Data Download SLURM Batch Script
-# -------------------------------------
-# This script submits a SLURM job to download ERA5 climate data using a Python script.
-#
-# Requirements:
-#   - SLURM workload manager
-#   - Python environment with required dependencies (see code/requirements.txt)
-#   - Update paths and environment names as needed
-#
-# Output:
-#   - Logs are saved in slurm_logs/ with job-specific filenames
-#   - Python script output is redirected to a log file
-#
-# Author: Youg Sanghvi
-# Date: July 7, 2025
-
 #!/bin/bash
 #SBATCH --job-name=dta-download
-#SBATCH --account=fc_carleton2025
-#SBATCH --partition=savio3
-#SBATCH --time=40:00:00
+#SBATCH --account=co_carleton
+#SBATCH --partition=savio4_htc
+#SBATCH --time=60:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
+#SBATCH --cpus-per-task=20
 #SBATCH --output slurm_logs/%j.out
 #SBATCH --error slurm_logs/%j.err
 #SBATCH --mail-user=yougsanghvi@berkeley.edu
@@ -30,7 +15,7 @@ module purge  # Unload all loaded modules for a clean environment
 
 cd ~/global_suicide_dummy  # Change to project directory
 
-PYTHON_SCRIPT="./code/climate_data_download_loops.py"  # Python script to run
+PYTHON_SCRIPT="./code/a_era5_download_cleaning/02_download.py"  # Python script to run
 LOG_FILE="./slurm_logs/$SLURM_JOB_ID.log"               # Log file for script output
 
 source ./climate-env/bin/activate  # Activate Python virtual environment
