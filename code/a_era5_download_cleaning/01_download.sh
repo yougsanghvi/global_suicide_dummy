@@ -22,3 +22,4 @@ source ./climate-env/bin/activate  # Activate Python virtual environment
 echo $(which python)               # Print Python interpreter path
 
 python $PYTHON_SCRIPT >& $LOG_FILE  # Run Python script and redirect output to log
+
