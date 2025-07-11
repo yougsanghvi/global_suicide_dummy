@@ -1,77 +1,65 @@
+import xarray as xr
+import pandas as pd
+import numpy as np
 import os
 import sys
-import xarray as xr
-import rioxarray
-import numpy as np
+from cftime import DatetimeGregorian
 
-# -----------------------
-# Command-line input
-# -----------------------
-year = int(sys.argv[1])
+year = int(sys.argv[1])  # e.g. 2000 from SLURM
 
-# -----------------------
-# Paths
-# -----------------------
-era5_daily_dir = "/global/scratch/users/yougsanghvi/era5_daily_by_year/"
-gdnat_dir = "/global/scratch/users/yougsanghvi/gdnat_tiff_files_by_yr/"
-output_dir = "/global/scratch/users/yougsanghvi/panel_diff_by_year/"
-os.makedirs(output_dir, exist_ok=True)
+# Output path
+out_dir = "/global/scratch/users/yougsanghvi/era5_gdnat_panel_diff/"
+os.makedirs(out_dir, exist_ok=True)
+out_path = os.path.join(out_dir, f"era5_gdnat_diff_{year}.nc")
 
-# -----------------------
-# Load ERA5 daily dataset
-# -----------------------
-era5_path = os.path.join(era5_daily_dir, f"era5_daily_mean_{year}.nc")
-era5_ds = xr.open_dataset(era5_path)
-era5_var = 't2m'  # Change if your ERA5 temperature variable is named differently
+# Skip if output file exists
+if os.path.exists(out_path):
+    print(f"Output file already exists for year {year}, skipping processing.")
+    sys.exit(0)
 
-# -----------------------
-# Load GDNat yearly raster
-# -----------------------
-gdnat_path = os.path.join(gdnat_dir, f"gdnat_{year}.tif")
-gdnat_ds = rioxarray.open_rasterio(gdnat_path).squeeze()  # remove band dim if present
+print("script started for year:", year)
 
-# -----------------------
-# Fix GDNat longitude from [0, 360) → [-180, 180)
-# -----------------------
-def shift_longitude_intuitive(ds, lon_name='x'):
-    lon = ds[lon_name].values  # get longitudes as numpy array
-    lon_corrected = lon.copy()
-    lon_corrected[lon_corrected > 180] -= 360  # shift longitudes >180 to west
-    ds = ds.assign_coords({lon_name: lon_corrected})
-    ds = ds.sortby(lon_name)
-    return ds
+# Input Paths
+era5_path = f"/global/scratch/users/yougsanghvi/era5_daily_by_year/era5_daily_mean_{year}.nc"
+gdnat_1 = "/global/scratch/users/yougsanghvi/global_suicide/gdnat_ACCESS-CM2_tas_1979-1999_v2025-02-11.zarr"
+gdnat_2 = "/global/scratch/users/yougsanghvi/global_suicide/gdnat_ACCESS-CM2_tas_2000-2020_v2025-02-11.zarr"
+gdnat_path = gdnat_1 if year <= 1999 else gdnat_2
 
-gdnat_ds = shift_longitude_intuitive(gdnat_ds, lon_name='x')
+# Load GDNat Zarr
+gdnat_ds = xr.open_zarr(gdnat_path)
 
-# Set CRS if missing
-if not gdnat_ds.rio.crs:
-    gdnat_ds = gdnat_ds.rio.write_crs("EPSG:4326")
+# Select the year slice by new time coordinate
+gdnat_year = gdnat_ds.sel(time=slice(f"{year}-01-01", f"{year}-12-31"))
+gdnat_year = gdnat_year.squeeze(dim='model', drop=True)
 
-# -----------------------
-# Expand GDNat to daily to match ERA5
-# -----------------------
-times = era5_ds.time.values  # daily timestamps
-gdnat_daily = gdnat_ds.expand_dims(time=times)  # same raster, repeated across days
+# Convert GDNat time values to DatetimeGregorian so they match ERA5
+gdnat_year['time'] = [DatetimeGregorian(t.year, t.month, t.day) for t in gdnat_year['time'].values]
 
-# -----------------------
-# Compute difference
-# -----------------------
-era5_temp = era5_ds[era5_var]
+# Load ERA5 dataset and temperature variable
+era5_ds = xr.open_dataset(era5_path, use_cftime=True)
 
-gdnat_daily = gdnat_daily.rename({'y': 'latitude', 'x': 'longitude'})
+era5_temp = era5_ds['t2m']
 
-diff_temp = era5_temp - gdnat_daily
+# Drop leap day to match GDNat's 365-day calendar
+era5_temp = era5_temp.sel(time=~((era5_temp.time.dt.month == 2) & (era5_temp.time.dt.day == 29)))
 
-# -----------------------
-# Save all to NetCDF
-# -----------------------
-out_ds = xr.Dataset({
-    'era5_temp': era5_temp,
-    'gdnat_temp': gdnat_daily,
-    'diff_temp': diff_temp
-})
+# Rename dims in GDNat to match ERA5 if needed:
+if 'lat' in gdnat_year.dims:
+    gdnat_year = gdnat_year.rename({'lat': 'latitude', 'lon': 'longitude'})
 
-out_path = os.path.join(output_dir, f"daily_panel_diff_{year}.nc")
-out_ds.to_netcdf(out_path)
+# Align the two datasets on time, latitude, longitude (inner join)
+era5_temp_aligned, gdnat_aligned = xr.align(era5_temp, gdnat_year['tas'], join='inner')
 
-print(f"✅ Saved daily panel difference dataset for year {year} to:\n{out_path}")
+# Print alignment info
+print(f"ERA5 shape before align: {era5_temp.shape} dims: {era5_temp.dims}")
+print(f"GDNat shape before align: {gdnat_year['tas'].shape} dims: {gdnat_year['tas'].dims}")
+print(f"ERA5 shape after align: {era5_temp_aligned.shape}")
+print(f"GDNat shape after align: {gdnat_aligned.shape}")
+
+# Calculate difference
+diff_temp = era5_temp_aligned - gdnat_aligned
+
+# Save output
+diff_temp.to_netcdf(os.path.join(out_path))
+
+print(f"Saved diff for {year}")

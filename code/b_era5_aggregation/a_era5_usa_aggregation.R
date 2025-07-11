@@ -161,12 +161,14 @@ for (year in start_year:end_year) { # for each loop instead
 
   # Read the raster data for the current year
   r <- terra::rast(current_filepath)
+  r_jan_feb <- r[[which(format(time(r), "%m") %in% c("01", "02"))]]
 
   # Crop the shifted raster to the extent of the USA counties polygons.
   r_crop <- terra::crop(r, usa_counties)
 
   # Convert temperature values from Kelvin to Celsius
   r_crop_celsius <- r_crop - 273.15
+  cat("finished running")
 
   # Run `stagg::staggregate_polynomial` for the current year's data.
   message(sprintf("  Running stagg::staggregate_polynomial for %d...", year))
