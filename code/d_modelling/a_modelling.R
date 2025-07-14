@@ -158,10 +158,8 @@ compute_lagged_stagg_yhat <- function(stagg_data, regression_betas) {
         stop("Some regression terms are not in the dataset columns.")
     }
 
-    # Multiply the coefficients with the corresponding columns
-    # and compute the predicted y_hat using matrix multiplication
     X <- as.matrix(stagg_data[, names(coef_vector)])
-    stagg_data$y_hat <- as.vector(X %*% coef_vector)
+    stagg_data$y_hat_gdnat <- as.vector(X %*% coef_vector)
 
     return(stagg_data)
 }
@@ -179,10 +177,7 @@ era5_results_lagged_clean <- compute_lagged_stagg_yhat(
 )
 
 era5_results_lagged_clean <- era5_results_lagged_clean %>%
-    rename(y_hat_era5 = y_hat)
-
-stagg_results_lagged_clean <- stagg_results_lagged_clean %>%
-    rename(y_hat_gdnat = y_hat)
+    rename(y_hat_era5 = y_hat_gdnat)
 
 # ----- IV. Merging Predictions -------
 
