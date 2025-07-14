@@ -41,6 +41,11 @@ era5_folderpath <- file.path("merged", "USA")
 era5_filename <- "USA_adm2_1968_2004_monthly.dta"
 era5_filepath <- file.path(dir_path, era5_folderpath, era5_filename)
 
+# era5 non merged file path
+era5_folderpath <- file.path("data", "climatedata", "USA")
+era5_filename <- "usa_area_era5_temp_average_1968_2004_polynomial_5_area_crop_weights.csv"
+era5_filepath <- file.path(dir_path, era5_folderpath, era5_filename)
+
 # Define paths for usa county shapefile
 usa_county_dir <- file.path(dir_path, "shapefiles")
 usa_county_filename <- "tl_2016_us_county_mortality.shp"
@@ -69,9 +74,6 @@ cat(magenta("cleaning data"))
 stagg_results_unique <- stagg_results %>%
     distinct()
 
-# 38% of rows are duplicated and I am not sure why
-# This needs to be checked but seems harmless for now
-
 # NA checking done in python, for now we just drop the NA values
 # It seems the NA values are all counties with water in them
 stagg_results_na_drop <- stagg_results_unique[
@@ -81,8 +83,8 @@ stagg_results_na_drop <- stagg_results_unique[
 #2. Cleaning ERA5 data
 
 # Checking NAs for ERA5 Data -- checks for GDNat data are done in python
-# na_counts <- sapply(era5_results, function(x) sum(is.na(x)))
-# era5_results_na <- era5_results[is.na(era5_results$order_1), ]
+na_counts <- sapply(era5_results, function(x) sum(is.na(x)))
+era5_results_na <- era5_results[is.na(era5_results$order_1), ]
 
 era5_results_clean <- era5_results %>%
   mutate(month = as.numeric(sub("month_", "", month)))
@@ -156,10 +158,8 @@ compute_lagged_stagg_yhat <- function(stagg_data, regression_betas) {
         stop("Some regression terms are not in the dataset columns.")
     }
 
-    # Multiply the coefficients with the corresponding columns
-    # and compute the predicted y_hat using matrix multiplication
     X <- as.matrix(stagg_data[, names(coef_vector)])
-    stagg_data$y_hat <- as.vector(X %*% coef_vector)
+    stagg_data$y_hat_gdnat <- as.vector(X %*% coef_vector)
 
     return(stagg_data)
 }
@@ -177,10 +177,7 @@ era5_results_lagged_clean <- compute_lagged_stagg_yhat(
 )
 
 era5_results_lagged_clean <- era5_results_lagged_clean %>%
-    rename(y_hat_era5 = y_hat)
-
-stagg_results_lagged_clean <- stagg_results_lagged_clean %>%
-    rename(y_hat_gdnat = y_hat)
+    rename(y_hat_era5 = y_hat_gdnat)
 
 # ----- IV. Merging Predictions -------
 
