@@ -4,14 +4,14 @@
 #' @param pkg Character string: The name of the package to install and load.
 #' @param ... Additional arguments passed to `install.packages()`.
 install_if_missing <- function(pkg, ...) {
-  if (!requireNamespace(pkg, quietly = TRUE)) {
-    install.packages(
-      pkg,
-      repos = "https://cloud.r-project.org",
-      ...
-    )
-  }
-  library(pkg, character.only = TRUE)
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+        install.packages(
+            pkg,
+            repos = "https://cloud.r-project.org",
+            ...
+        )
+    }
+    library(pkg, character.only = TRUE)
 }
 
 install_if_missing("crayon")
@@ -41,6 +41,11 @@ era5_folderpath <- file.path("merged", "USA")
 era5_filename <- "USA_adm2_1968_2004_monthly.dta"
 era5_filepath <- file.path(dir_path, era5_folderpath, era5_filename)
 
+# era5 non merged file path
+era5_folderpath <- file.path("data", "climatedata", "USA")
+era5_filename <- "usa_area_era5_temp_average_1968_2004_polynomial_5_area_crop_weights.csv"
+era5_filepath <- file.path(dir_path, era5_folderpath, era5_filename)
+
 # Define paths for usa county shapefile
 usa_county_dir <- file.path(dir_path, "shapefiles")
 usa_county_filename <- "tl_2016_us_county_mortality.shp"
@@ -57,7 +62,7 @@ output_path <- file.path(dir_path, "gdnat_era5_compare_output")
 # Load the required datasets
 stagg_results <- read.csv(results_file_path)
 regression_betas <- read.csv(regression_beta_fp)
-era5_results <- readstata13::read.dta13(era5_filepath)
+era5_results <- read.csv(era5_filepath)
 usa_shapefile <- st_read(usa_county_path)
 geocode_file <- read.csv(geocode_filepath)
 
@@ -67,182 +72,117 @@ cat(magenta("cleaning data"))
 
 # dropping duplicates
 stagg_results_unique <- stagg_results %>%
-  distinct()
+    distinct()
 
 # NA checking done in python, for now we just drop the NA values
 # It seems the NA values are all counties with water in them
 stagg_results_na_drop <- stagg_results_unique[
-  complete.cases(stagg_results_unique),
+    complete.cases(stagg_results_unique),
 ]
 
 #2. Cleaning ERA5 data
 
 # Checking NAs for ERA5 Data -- checks for GDNat data are done in python
 na_counts <- sapply(era5_results, function(x) sum(is.na(x)))
-era5_results_na <- era5_results[is.na(era5_results$tavg_poly1_aw), ]
+era5_results_na <- era5_results[is.na(era5_results$order_1), ]
 
-# Aleutian Islands has missing temperature data and there are several...
-# ... rows with NA county names which will be dropped
-# This must be verified
-
-era5_results_na_drop <- era5_results[!is.na(era5_results$tavg_poly1_aw), ]
-
-# Now, filtering only for age = 0 and gender = 0...
-# Since these are the "total" cateogories
-
-era5_results_na_drop <- era5_results_na_drop %>%
-  filter(gender == 0 & agegroup == 0)
-
-era5_results_na_drop <- era5_results_na_drop %>%
-  dplyr::select(-gender, -agegroup)
+era5_results_clean <- era5_results %>%
+  mutate(month = as.numeric(sub("month_", "", month)))
 
 # ----- III. Running predictions for the models -------
-# ----- Predicting for GDNat -------#
-
 cat(green("creating predicted suicide rate"))
-# Assume stagg_results has year, month, poly_id, order_1..order_4
 
-# Step 1: Create a date column for easier lagging and days calculation
-stagg_results_na_drop <- stagg_results_na_drop %>%
-  mutate(date = as.Date(paste(year, month, "01", sep = "-")))
+# ----- Function to Predict -------#
 
-# Step 2: Create days in month
-stagg_results_na_drop <- stagg_results_na_drop %>%
-  mutate(days_in_month = lubridate::days_in_month(date))
+compute_lagged_stagg_yhat <- function(stagg_data, regression_betas) {
+    # Step 1: Create date column
+    stagg_data <- stagg_data %>%
+        mutate(date = as.Date(paste(year, month, "01", sep = "-")))
 
-# Step 3: divide total temp by nmber of days in each month
-# create lag variables
-stagg_results_lagged <- stagg_results_na_drop %>%
-  mutate(across(
-    order_1:order_4,
-    ~ . / days_in_month,
-    .names = "{.col}_avg"
-  )) %>%
-  arrange(poly_id, date) %>%
-  group_by(poly_id) %>%
-  mutate(across(
-    ends_with("_avg"),
-    list(
-      `0` = ~.,
-      `1` = ~ lag(., 1),
-      `2` = ~ lag(., 2),
-      `3` = ~ lag(., 3),
-      `4` = ~ lag(., 4),
-      `5` = ~ lag(., 5),
-      `6` = ~ lag(., 6),
-      `7` = ~ lag(., 7),
-      `8` = ~ lag(., 8),
-      `9` = ~ lag(., 9),
-      `10` = ~ lag(., 10),
-      `11` = ~ lag(., 11)
-    ),
-    .names = "{.col}_lag{.fn}"
-  )) %>%
-  ungroup()
+    # Step 2: Days in month
+    stagg_data <- stagg_data %>%
+        mutate(days_in_month = lubridate::days_in_month(date))
 
-rename_vars <- expand.grid(order = 1:4, lag = 0:11) %>%
-  mutate(
-    old = paste0("order_", order, "_avg_lag", lag),
-    new = paste0("tavg_poly", order, "_l", lag)
-  )
+    # Step 3: Compute monthly average for orders 1-4
+    stagg_data <- stagg_data %>%
+        mutate(across(
+            order_1:order_4,
+            ~ . / days_in_month,
+            .names = "{.col}_avg"
+        )) %>%
+        arrange(poly_id, date) %>%
+        group_by(poly_id) %>%
+        mutate(across(
+            ends_with("_avg"),
+            list(
+                `0` = ~.,
+                `1` = ~ lag(., 1),
+                `2` = ~ lag(., 2),
+                `3` = ~ lag(., 3),
+                `4` = ~ lag(., 4),
+                `5` = ~ lag(., 5),
+                `6` = ~ lag(., 6),
+                `7` = ~ lag(., 7),
+                `8` = ~ lag(., 8),
+                `9` = ~ lag(., 9),
+                `10` = ~ lag(., 10),
+                `11` = ~ lag(., 11)
+            ),
+            .names = "{.col}_lag{.fn}"
+        )) %>%
+        ungroup()
 
-names(stagg_results_lagged)[match(
-  rename_vars$old,
-  names(stagg_results_lagged)
-)] <- rename_vars$new
+    # Step 4: Rename lagged variable names to match regression term names
+    rename_vars <- expand.grid(order = 1:4, lag = 0:11) %>%
+        mutate(
+            old = paste0("order_", order, "_avg_lag", lag),
+            new = paste0("tavg_poly", order, "_l", lag)
+        )
 
-# removing first 11 dates
-stagg_results_lagged_clean <- stagg_results_lagged %>%
-  arrange(poly_id, date) %>%
-  group_by(poly_id) %>%
-  slice(-(1:11)) %>%
-  ungroup()
+    names(stagg_data)[match(
+        rename_vars$old,
+        names(stagg_data)
+    )] <- rename_vars$new
 
-# Create named vector of regression betas using 'term' column
-coef_vector <- setNames(regression_betas$beta, regression_betas$term)
+    # Step 5: Remove first 11 months per poly_id (due to lagging)
+    stagg_data <- stagg_data %>%
+        arrange(poly_id, date) %>%
+        group_by(poly_id) %>%
+        slice(-(1:11)) %>%
+        ungroup()
 
-# Extract predictor matrix from dataset using variable names from coef_vector
-X <- stagg_results_lagged_clean[, names(coef_vector)] |> as.matrix()
+    # Step 6: Compute predicted y_hat using regression betas
+    coef_vector <- setNames(regression_betas$beta, regression_betas$term)
 
-# Compute predicted y_hat as matrix multiplication
-stagg_results_lagged_clean$y_hat_gdnat <- as.vector(X %*% coef_vector)
+    if (!all(names(coef_vector) %in% names(stagg_data))) {
+        stop("Some regression terms are not in the dataset columns.")
+    }
 
-# ----- Predicting for ERA5 -------#
+    # Multiply the coefficients with the corresponding columns
+    # and compute the predicted y_hat using matrix multiplication
+    X <- as.matrix(stagg_data[, names(coef_vector)])
+    stagg_data$y_hat <- as.vector(X %*% coef_vector)
 
-# Step 1: Create a date column for easier lagging and days calculation
-era5_results_na_drop <- era5_results_na_drop %>%
-  mutate(date = as.Date(paste(year, month, "01", sep = "-")))
+    return(stagg_data)
+}
 
-# Step 2: Create days in month
-era5_results_na_drop <- era5_results_na_drop %>%
-  mutate(days_in_month = lubridate::days_in_month(date))
+# Predicting for GDNat
+stagg_results_lagged_clean <- compute_lagged_stagg_yhat(
+    stagg_results_na_drop,
+    regression_betas
+)
 
-# Step 3: divide total temp by number of days in each month
-# create lag variables
-era5_results_lagged <- era5_results_na_drop %>%
-  arrange(countyname, date) %>%
-  group_by(countyname) %>%
-  mutate(across(
-    starts_with("tavg"),
-    list(
-      `0` = ~.,
-      `1` = ~ lag(., 1),
-      `2` = ~ lag(., 2),
-      `3` = ~ lag(., 3),
-      `4` = ~ lag(., 4),
-      `5` = ~ lag(., 5),
-      `6` = ~ lag(., 6),
-      `7` = ~ lag(., 7),
-      `8` = ~ lag(., 8),
-      `9` = ~ lag(., 9),
-      `10` = ~ lag(., 10),
-      `11` = ~ lag(., 11)
-    ),
-    .names = "{.col}_l{.fn}"
-  )) %>%
-  ungroup()
+# Predicting for ERA5
+era5_results_lagged_clean <- compute_lagged_stagg_yhat(
+    era5_results_clean,
+    regression_betas
+)
 
-era5_results_lagged <- era5_results_lagged %>%
-  select(
-    year,
-    month,
-    num_of_suicide,
-    suiciderate,
-    adm2_id,
-    statename,
-    countyname,
-    starts_with("tavg"),
-    date
-  )
+era5_results_lagged_clean <- era5_results_lagged_clean %>%
+    rename(y_hat_era5 = y_hat)
 
-# removing first 11 dates
-era5_results_lagged_clean <- era5_results_lagged %>%
-  arrange(countyname, date) %>%
-  group_by(countyname) %>%
-  slice(-(1:11)) %>%
-  ungroup()
-
-# Create rename mapping for era5 variables
-rename_vars <- expand.grid(order = 1:5, lag = 0:11) %>%
-  mutate(
-    old = paste0("tavg_poly", order, "_aw_l", lag),
-    new = paste0("tavg_poly", order, "_l", lag)
-  )
-
-names(era5_results_lagged_clean)[match(
-  rename_vars$old,
-  names(era5_results_lagged_clean)
-)] <- rename_vars$new
-
-# Create named vector of regression betas using 'term' column
-coef_vector <- setNames(regression_betas$beta, regression_betas$term)
-
-# Extract predictor matrix from dataset using variable names from coef_vector
-X <- era5_results_lagged_clean[, names(coef_vector)] |> as.matrix()
-
-# Compute predicted y_hat as matrix multiplication
-era5_results_lagged_clean$y_hat_era5 <- as.vector(X %*% coef_vector)
-
+stagg_results_lagged_clean <- stagg_results_lagged_clean %>%
+    rename(y_hat_gdnat = y_hat)
 
 # ----- IV. Merging Predictions -------
 
@@ -252,81 +192,59 @@ cat(yellow("merging and saving the final dataset"))
 # merging in county names to verify the keys...
 # ... are accurate for merging later on
 usa_shapefile_filtered <- usa_shapefile %>%
-  mutate(GEOID_int = as.integer(GEOID)) %>%
-  select(GEOID_int, NAME, NAMELSAD, ID_1, ID_2, geometry)
+    mutate(GEOID_int = as.integer(GEOID)) %>%
+    select(GEOID_int, NAME, NAMELSAD, ID_1, ID_2, geometry)
 
 gdnat_final <- stagg_results_lagged_clean %>%
-  filter(year < 2005 & year > 1979) %>% # 1979 only has values for december ...
-  # ... need to check if this is an issue of just data format
-  mutate(poly_id_int = as.integer(poly_id)) %>%
-  arrange(poly_id_int, year, month) %>%
-  left_join(
-    usa_shapefile_filtered,
-    by = c(
-      "poly_id_int" = "GEOID_int"
+    filter(year < 2005 & year > 1979) %>% # 1979 only has values for december ...
+    # ... need to check if this is an issue of just data format
+    mutate(poly_id_int = as.integer(poly_id)) %>%
+    arrange(poly_id_int, year, month) %>%
+    left_join(
+        usa_shapefile_filtered,
+        by = c(
+            "poly_id_int" = "GEOID_int"
+        )
+    ) %>%
+    select(
+        year,
+        month,
+        y_hat_gdnat,
+        poly_id_int,
+        NAME,
+        NAMELSAD,
+        ID_1,
+        ID_2,
+        date,
+        order_1_avg
     )
-  ) %>%
-  select(
-    year,
-    month,
-    y_hat_gdnat,
-    poly_id_int,
-    NAME,
-    NAMELSAD,
-    ID_1,
-    ID_2
-  )
+
 
 era5_final <- era5_results_lagged_clean %>%
-  select(-starts_with("tavg")) %>%
-  filter(year > 1979) # we only have gdnat data post 1979
+    select(
+        year,
+        month,
+        order_1_avg,
+        date,
+        y_hat_era5,
+        poly_id
+    ) %>%
+    filter(year > 1979) # we only have gdnat data post 1979
 
-# Removing counties that are unmatched in both datasets, for now
-# Assuming the issue is in different weighting / data generation
-# processes
-# This needs to be verified!!!
-
-# Get unique poly_id_int from gdnat_final
-gdnat_ids <- unique(gdnat_final$poly_id_int)
-# Get unique adm2_id from era5_final
-era5_ids <- unique(era5_final$adm2_id)
-
-unmatched_gdnat <- gdnat_final %>%
-  anti_join(era5_final, by = c("poly_id_int" = "adm2_id")) 
-
-unmatched_gdnat_ids_list <- unmatched_gdnat %>%
-  distinct(poly_id_int) %>%
-  pull(poly_id_int)
-
-unmatched_era5 <- era5_final %>%
-  anti_join(gdnat_final, by = c("adm2_id" = "poly_id_int"))
-
-unmatched_era5_ids_list <- unmatched_era5 %>%
-  distinct(adm2_id) %>%
-  pull(adm2_id)
-
-gdnat_final_filtered <- gdnat_final %>%
-  filter(!(poly_id_int %in% unmatched_gdnat_ids_list))
-
-era5_final_filtered <- era5_final %>%
-  filter(!(adm2_id %in% unmatched_era5_ids_list))
-
-# full join causes issues which must be explored in the future 
-# only 50% of gdnat rows find a match in era5 
-# there might be duplication issue
-
-merged_data_panel <- left_join(
-  era5_final_filtered,
-  gdnat_final_filtered,
+merged_data_panel_clean <- full_join(
+  era5_final,
+  gdnat_final,
   by = c(
-    "adm2_id" = "poly_id_int", # Match on the ID
-    "month", # Match on the month column (assuming it's named 'month' in both)
-    "year" # Match on the year column (assuming it's named 'year' in both)
+    "poly_id" = "poly_id_int",
+    "year" = "year",
+    "month" = "month"
   )
 )
 
-merged_data_panel_clean <- merged_data_panel %>%
-  select(-NAME, -NAMELSAD)
+# rename the order one averages to include era5 or gdnat 
+
+colSums(is.na(merged_data_panel_clean))
+
 
 panel_output_filename <- "merged_data_panel_extended.csv"
 panel_output_filepath <- file.path(output_path, panel_output_filename)
