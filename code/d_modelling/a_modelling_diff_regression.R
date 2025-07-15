@@ -105,6 +105,22 @@ for (lag in 0:11) {
   merged_data[[paste0("tavg_poly1_aw_avg_era5_lag", lag)]] <- dplyr::lag(merged_data$tavg_poly1_aw_avg_era5, lag)
   merged_data[[paste0("diff_avg_temp_lag", lag)]] <- merged_data[[paste0("tavg_poly1_aw_avg_era5_lag", lag)]] - merged_data[[paste0("order_1_avg_gdnat_lag", lag)]]
 }
+for (poly in 1:4) {
+  for (lag in 0:11) {
+    # Construct regression feature name, e.g. tavg_poly1_l0
+    reg_name <- paste0("tavg_poly", poly, "_l", lag)
+    # Find corresponding column in merged_data
+    era5_col <- paste0("tavg_poly", poly, "_aw_lag", lag)
+    # If column exists, copy to regression name
+    if (era5_col %in% colnames(merged_data)) {
+      merged_data[[reg_name]] <- merged_data[[era5_col]]
+    } else if (poly == 1 && (paste0("tavg_poly1_aw_avg_era5_lag", lag) %in% colnames(merged_data))) {
+      # For poly1, handle special case for avg column
+      merged_data[[reg_name]] <- merged_data[[paste0("tavg_poly1_aw_avg_era5_lag", lag)]]
+    }
+  }
+}
+cat(yellow("[Step 11b] Renamed ERA5 lagged columns to match regression file features.\n"))
 
 cat(yellow("[Step 11] Computed lagged features and differences.\n"))
 
