@@ -79,20 +79,10 @@ merged_data <- merged_data %>%
   slice(-(1:11)) %>%
   ungroup()
 
-# Regression on differences
-reg_terms <- paste0("diff_avg_temp_lag", 0:11)
-reg_formula <- paste("suiciderate ~", paste(reg_terms, collapse = " + "))
-regression_result <- fixest::feols(as.formula(reg_formula), data = merged_data)
-summary(regression_result)
 
-# Save output
-
-# Save output with county metadata
+# Save output with county metadata and predictions
 panel_output_filename <- "merged_data_panel_differences.csv"
 panel_output_filepath <- file.path(output_path, panel_output_filename)
 readr::write_csv(merged_data %>% select(year, month, NAME, NAMELSAD, ID_1, ID_2, everything()), panel_output_filepath)
 
-# Optionally save regression summary
-regression_summary_filename <- "regression_differences_summary.txt"
-regression_summary_filepath <- file.path(output_path, regression_summary_filename)
-writeLines(capture.output(summary(regression_result)), regression_summary_filepath)
+cat(green("Saved merged panel with predictions to output directory.\n"))
