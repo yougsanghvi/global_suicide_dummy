@@ -65,7 +65,7 @@ if (!dir.exists(output_dir)) {
 
 # Define the range of years to process
 start_year <- 1979
-end_year <- 1979
+end_year <- 2004
 
 # DO NOT CHANGE -- no overwrite functionality can be added soon...
 # ... but not already present
@@ -87,22 +87,6 @@ ext(usa_counties)
 # Ensure the Coordinate Reference System (CRS) is WGS84 (EPSG:4326) for consistency.
 
 usa_counties <- sf::st_transform(usa_counties, 4326)
-
-# Create a bounding box polygon using the same extent
-bbox_polygon <- sf::st_as_sfc(sf::st_bbox(
-  c(
-    xmin = -90,
-    xmax = -75,
-    ymin = 30,
-    ymax = 37
-  ),
-  crs = st_crs(usa_counties)
-))
-
-bbox_extent <- terra::ext(-90, -75, 30, 37) # setting the same variables to crop era5 data
-
-# Subset counties that intersect with the bounding box
-usa_counties <- sf::st_intersection(usa_counties, bbox_polygon)
 
 # Fix any invalid geometries within the `usa_counties` dataset.
 # Invalid geometries can cause issues in spatial operations.
@@ -128,6 +112,7 @@ era5_all_years_aggregated_data <- list()
 
 # Loop through each year, process the corresponding raster, and aggregate
 for (year in start_year:end_year) {
+  tic("Processing year: ", year) # Start timing for the current year
   # for each loop instead
   message(sprintf("Processing year: %d", year))
 
@@ -187,23 +172,26 @@ for (year in start_year:end_year) {
   r <- terra::rast(current_filepath)
   toc() # Print the time taken for reading the raster
 
-  tic("Raster extent before cropping:\n")
-  print(ext(r)) # Print the extent of the raster
-  toc() # Print the time taken for printing the extent
+  #tic("Raster extent before cropping:\n")
+  #print(ext(r)) # Print the extent of the raster
+  #toc() # Print the time taken for printing the extent
 
-  tic("Raster cropping")
-  r <- terra::crop(r, bbox_extent) # remove this to run whole USA -- only debugging
-  toc() # Print the time taken for cropping
+  #tic("Raster cropping")
+  #r <- terra::crop(r, bbox_extent) # remove this to run whole USA -- only debugging
+  #toc() # Print the time taken for cropping
 
-  r_crop <- r[[which(format(time(r), "%m") %in% c("01", "02"))]]
+  #r_crop <- r[[which(format(time(r), "%m") %in% c("01", "02"))]]
 
   # Crop the shifted raster to the extent of the USA counties polygons.
-  # r_crop <- terra::crop(r, usa_counties)
+  cat("Cropping raster to USA counties...\n")
+  tic("Cropping raster to USA counties")
+  r_crop <- terra::crop(r, usa_counties)  
+  toc() # Print the time taken for cropping
 
   # Convert temperature values from Kelvin to Celsius
   r_crop_celsius <- r_crop - 273.15
-  cat("raster extent after cropping to USA counties:\n")
-  ext(r_crop_celsius)
+  #cat("raster extent after cropping to USA counties:\n")
+  #ext(r_crop_celsius)
 
   # Run `stagg::staggregate_polynomial` for the current year's data.
   tic()
@@ -213,7 +201,7 @@ for (year in start_year:end_year) {
     overlay_weights = county_weights,
     daily_agg = "average",
     time_agg = "month",
-    start_date = paste0(year, "-01-01 00:00:00"),
+    start_date = paste0(year,"-01-01 00:00:00"),
     time_interval = "1 hour",
     degree = 4
   )
@@ -221,35 +209,6 @@ for (year in start_year:end_year) {
 
   # Add a 'year' column to the aggregated data for later combination
   temp_out$year <- year
-
-  # Add number of days in each month
-  cat("Adding number of days in each month...\n")
-  # Create a logical vector where year and month are both NOT NA
-  valid_dates <- !is.na(temp_out$year) & !is.na(temp_out$month)
-
-  # Initialize days_in_month with NA
-  temp_out$days_in_month <- NA_integer_
-
-  # Only compute days_in_month where year and month are valid
-  temp_out$days_in_month[valid_dates] <- lubridate::days_in_month(
-    as.Date(paste0(
-      temp_out$year[valid_dates],
-      "-",
-      temp_out$month[valid_dates],
-      "-01"
-    ))
-  )
-
-  # Then divide order_x by days_in_month; assign NA_avg where days_in_month is NA
-  for (i in 1:4) {
-    order_col <- paste0("order_", i)
-    avg_col <- paste0(order_col, "_avg")
-    temp_out[[avg_col]] <- ifelse(
-      is.na(temp_out$days_in_month),
-      NA_real_,
-      temp_out[[order_col]] / temp_out$days_in_month
-    )
-  }
 
   # Save the current year's aggregated data separately
   output_filename <- sprintf("era5_usa_agg_%d.csv", year)
@@ -263,6 +222,7 @@ for (year in start_year:end_year) {
 
   # Store the current year's aggregated data in the list for combined output
   era5_all_years_aggregated_data[[as.character(year)]] <- temp_out
+  toc() # Print the time taken for processing the current year
 } # END OF FOR LOOP
 
 # Combine all yearly aggregated data into a single data frame
@@ -313,5 +273,3 @@ message(sprintf(
 
 # the file name also needs to be changed and the code reran
 # currently it is merging in old files
-
-# add functionality to here itself divide by number of daysd in month for each of the data (do inside the loop)

@@ -1,16 +1,23 @@
-# code incomplete and in progress!
-
 #!/bin/bash
 #SBATCH --job-name=era5_daily
-#SBATCH --output=logs/era5_daily_%A_%a.out
-#SBATCH --error=logs/era5_daily_%A_%a.err
-#SBATCH --time=02:00:00
-#SBATCH --mem=16G
-#SBATCH --cpus-per-task=2
-#SBATCH --array=2000-2004
+#SBATCH --account=co_carleton
+#SBATCH --partition=savio4_htc
+#SBATCH --time=6:00:00
+#SBATCH --cpus-per-task=5
+#SBATCH --array=0-1
+#SBATCH --output=slurm_logs/%A_%a.out
+#SBATCH --error=slurm_logs/%A_%a.err
+#SBATCH --mail-user=yougsanghvi@berkeley.edu
 
-module load python/3.8  # or appropriate module
+module purge  # Clean environment
+cd ~/global_suicide_dummy  # Change to your project directory
 
-YEAR=${SLURM_ARRAY_TASK_ID}
+PYTHON_SCRIPT="./code/a_era5_download_cleaning/04_daily_agg.py" 
 
-python process_era5_year.py $YEAR
+source ./climate-env/bin/activate  # Activate virtual environment
+echo "Using Python: $(which python)"
+
+START_YEAR=1989
+YEAR=$((START_YEAR + SLURM_ARRAY_TASK_ID))
+python $PYTHON_SCRIPT $YEAR
+

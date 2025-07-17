@@ -2,10 +2,10 @@
 #SBATCH --job-name=dta-download
 #SBATCH --account=co_carleton
 #SBATCH --partition=savio4_htc
-#SBATCH --time=60:00:00
+#SBATCH --time=1:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=20
+#SBATCH --cpus-per-task=5
 #SBATCH --output slurm_logs/%j.out
 #SBATCH --error slurm_logs/%j.err
 #SBATCH --mail-user=yougsanghvi@berkeley.edu

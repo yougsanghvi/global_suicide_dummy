@@ -110,6 +110,12 @@ merged_data <- merged_data %>%
     days_in_month = lubridate::days_in_month(date)
   )
 
+
+
+
+
+
+
 # Example: create lagged features for order_1_avg (GDNat) and tavg_poly1_aw (ERA5)
 merged_data <- merged_data %>%
   mutate(

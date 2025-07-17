@@ -41,8 +41,8 @@ data_folder = os.path.join(data_dir, "era5_hourly_by_year")
 os.makedirs(data_folder, exist_ok=True)
 os.makedirs(log_path, exist_ok=True)
 
-start_year = 1979
-end_year = 2020
+start_year = 1989
+end_year = 1990
 years = list(range(start_year, end_year + 1))
 
 MAX_WORKERS = 3  # Adjust number of parallel threads as needed

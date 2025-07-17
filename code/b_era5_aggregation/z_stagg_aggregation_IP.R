@@ -28,9 +28,6 @@ install_if_missing("terra") # For raster operations
 install_if_missing("crayon") # For printing colored messages in the console
 install_if_missing("tictoc") # For timing code execution
 
-# for each
-#
-
 # Install `stagg` from GitHub if it's not already installed.
 # `remotes` is required to install packages directly from GitHub.
 if (!requireNamespace("stagg", quietly = TRUE)) {
@@ -54,7 +51,7 @@ usa_county_path <- file.path(usa_county_dir, usa_county_filename)
 
 # Define the generic filename pattern for yearly NetCDF/TIFF files.
 # The `{year}` placeholder will be replaced in the loop.
-era5_filename_pattern <- "era5_data_%d.grib" # e.g., era5_data_1979.grib
+filename_pattern <- "era5_data_%d.grib" # e.g., era5_data_1979.grib
 
 # Define an output directory for the aggregated results
 output_dir <- file.path(dir, "aggregated_results_era5_usa")
@@ -63,9 +60,17 @@ if (!dir.exists(output_dir)) {
   message("Created output directory: ", output_dir)
 }
 
+file_format_prefix <- "era5_usa_agg_" # the year will be appended to this prefix
+
+# Define the full path for the final merged output file.
+output_filepath_all_years <- file.path(
+  output_dir,
+  "era5_usa_agg_all_years.csv"
+)
+
 # Define the range of years to process
 start_year <- 1979
-end_year <- 1979
+end_year <- 2004
 
 # DO NOT CHANGE -- no overwrite functionality can be added soon...
 # ... but not already present
@@ -77,6 +82,11 @@ overwrite <- TRUE
 # !!! add functionality to change file names based on this
 pop_weight <- TRUE
 
+# variable to set if data is already daily aggregated
+# set to TRUE if data is already daily aggregated
+# for eg for GDNAT data
+daily <- FALSE
+
 # ------ 3. Polygon Data Preparation (USA Counties) ------
 
 cat(crayon::blue("Calculating overlay weights...\n"))
@@ -87,22 +97,6 @@ ext(usa_counties)
 # Ensure the Coordinate Reference System (CRS) is WGS84 (EPSG:4326) for consistency.
 
 usa_counties <- sf::st_transform(usa_counties, 4326)
-
-# Create a bounding box polygon using the same extent
-bbox_polygon <- sf::st_as_sfc(sf::st_bbox(
-  c(
-    xmin = -90,
-    xmax = -75,
-    ymin = 30,
-    ymax = 37
-  ),
-  crs = st_crs(usa_counties)
-))
-
-bbox_extent <- terra::ext(-90, -75, 30, 37) # setting the same variables to crop era5 data
-
-# Subset counties that intersect with the bounding box
-usa_counties <- sf::st_intersection(usa_counties, bbox_polygon)
 
 # Fix any invalid geometries within the `usa_counties` dataset.
 # Invalid geometries can cause issues in spatial operations.
@@ -124,15 +118,16 @@ if (pop_weight) {
 
 cat(crayon::magenta("Starting raster data processing and aggregation...\n"))
 # Initialize an empty list to store aggregated data for all years
-era5_all_years_aggregated_data <- list()
+all_years_aggregated_data <- list()
 
 # Loop through each year, process the corresponding raster, and aggregate
 for (year in start_year:end_year) {
+  tic("Processing year: ", year) # Start timing for the current year
   # for each loop instead
   message(sprintf("Processing year: %d", year))
 
   # Construct the full path for the current year's TIFF file
-  current_filename <- sprintf(era5_filename_pattern, year)
+  current_filename <- sprintf(filename_pattern, year)
   current_filepath <- file.path(dir_tiff, current_filename)
 
   # Check if the file exists before processing
@@ -187,72 +182,64 @@ for (year in start_year:end_year) {
   r <- terra::rast(current_filepath)
   toc() # Print the time taken for reading the raster
 
-  tic("Raster extent before cropping:\n")
-  print(ext(r)) # Print the extent of the raster
-  toc() # Print the time taken for printing the extent
+  if (terra::xmax(r) > 180) {
+    r <- terra::rotate(r)
+  }
 
-  tic("Raster cropping")
-  r <- terra::crop(r, bbox_extent) # remove this to run whole USA -- only debugging
-  toc() # Print the time taken for cropping
+  #tic("Raster extent before cropping:\n")
+  #print(ext(r)) # Print the extent of the raster
+  #toc() # Print the time taken for printing the extent
 
-  r_crop <- r[[which(format(time(r), "%m") %in% c("01", "02"))]]
+  #tic("Raster cropping")
+  #r <- terra::crop(r, bbox_extent) # remove this to run whole USA -- only debugging
+  #toc() # Print the time taken for cropping
+
+  #r_crop <- r[[which(format(time(r), "%m") %in% c("01", "02"))]]
 
   # Crop the shifted raster to the extent of the USA counties polygons.
-  # r_crop <- terra::crop(r, usa_counties)
+  cat("Cropping raster to USA counties...\n")
+  tic("Cropping raster to USA counties")
+  r_crop <- terra::crop(r, usa_counties)
+  toc() # Print the time taken for cropping
 
   # Convert temperature values from Kelvin to Celsius
   r_crop_celsius <- r_crop - 273.15
-  cat("raster extent after cropping to USA counties:\n")
-  ext(r_crop_celsius)
+  #cat("raster extent after cropping to USA counties:\n")
+  #ext(r_crop_celsius)
 
+  # Run `stagg::staggregate_polynomial` for the current year's data.
   # Run `stagg::staggregate_polynomial` for the current year's data.
   tic()
   message(sprintf("  Running stagg::staggregate_polynomial for %d...", year))
-  temp_out <- stagg::staggregate_polynomial(
-    data = r_crop_celsius,
-    overlay_weights = county_weights,
-    daily_agg = "average",
-    time_agg = "month",
-    start_date = paste0(year, "-01-01 00:00:00"),
-    time_interval = "1 hour",
-    degree = 4
-  )
+
+  if (!daily) {
+    temp_out <- stagg::staggregate_polynomial(
+      data = r_crop_celsius,
+      overlay_weights = county_weights,
+      daily_agg = "average",
+      time_agg = "month",
+      start_date = paste0(year, "-01-01 00:00:00"),
+      time_interval = "1 hour",
+      degree = 4
+    )
+  } else {
+    temp_out <- stagg::staggregate_polynomial(
+      data = r_crop_celsius,
+      overlay_weights = county_weights,
+      start_date = sprintf("%d-01-01 00:00:00", year),
+      time_interval = "24 hour",
+      daily_agg = "none",
+      time_agg = "month",
+      degree = 4
+    )
+  }
   toc() # Print the time taken for aggregation
 
   # Add a 'year' column to the aggregated data for later combination
   temp_out$year <- year
 
-  # Add number of days in each month
-  cat("Adding number of days in each month...\n")
-  # Create a logical vector where year and month are both NOT NA
-  valid_dates <- !is.na(temp_out$year) & !is.na(temp_out$month)
-
-  # Initialize days_in_month with NA
-  temp_out$days_in_month <- NA_integer_
-
-  # Only compute days_in_month where year and month are valid
-  temp_out$days_in_month[valid_dates] <- lubridate::days_in_month(
-    as.Date(paste0(
-      temp_out$year[valid_dates],
-      "-",
-      temp_out$month[valid_dates],
-      "-01"
-    ))
-  )
-
-  # Then divide order_x by days_in_month; assign NA_avg where days_in_month is NA
-  for (i in 1:4) {
-    order_col <- paste0("order_", i)
-    avg_col <- paste0(order_col, "_avg")
-    temp_out[[avg_col]] <- ifelse(
-      is.na(temp_out$days_in_month),
-      NA_real_,
-      temp_out[[order_col]] / temp_out$days_in_month
-    )
-  }
-
   # Save the current year's aggregated data separately
-  output_filename <- sprintf("era5_usa_agg_%d.csv", year)
+  output_filename <- sprintf("%s%d.csv", file_format_prefix, year)
   output_filepath <- file.path(output_dir, output_filename)
   write.csv(temp_out, output_filepath, row.names = FALSE)
   message(sprintf(
@@ -262,7 +249,8 @@ for (year in start_year:end_year) {
   ))
 
   # Store the current year's aggregated data in the list for combined output
-  era5_all_years_aggregated_data[[as.character(year)]] <- temp_out
+  all_years_aggregated_data[[as.character(year)]] <- temp_out
+  toc() # End timing for the current year
 } # END OF FOR LOOP
 
 # Combine all yearly aggregated data into a single data frame
@@ -272,10 +260,13 @@ for (year in start_year:end_year) {
 # Make this an automatic change in the future by setting file names dynamically
 
 # List all yearly aggregated CSV files in the output directory.
+
+pattern <- sprintf("^%s.*\\.csv$", file_format_prefix)
+
 all_csv_files <- list.files(
   path = output_dir,
-  pattern = "^era5_usa_agg_.*\\.csv$", # Matches files like "gdnat_usa_agg_YYYY.csv"
-  full.names = TRUE # Get full file paths
+  pattern = pattern,
+  full.names = TRUE
 )
 
 cat(crayon::yellow(sprintf(
@@ -290,12 +281,6 @@ list_of_dfs <- lapply(all_csv_files, read.csv, stringsAsFactors = FALSE)
 
 # Combine all data frames into a single data frame by row.
 combined_df <- do.call(rbind, list_of_dfs)
-
-# Define the full path for the final merged output file.
-output_filepath_all_years <- file.path(
-  output_dir,
-  "era5_usa_agg_all_years.csv"
-)
 
 # Save the combined data frame to a new CSV file.
 write.csv(combined_df, output_filepath_all_years, row.names = FALSE)
@@ -313,5 +298,3 @@ message(sprintf(
 
 # the file name also needs to be changed and the code reran
 # currently it is merging in old files
-
-# add functionality to here itself divide by number of daysd in month for each of the data (do inside the loop)
