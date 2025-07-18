@@ -12,7 +12,13 @@
 #' Helper function to install and load CRAN packages if they are missing
 install_if_missing <- function(pkg, ...) {
   if (!requireNamespace(pkg, quietly = TRUE)) {
-    install.packages(pkg, repos = "https://cloud.r-project.org", ...)
+    # Set up personal library if it doesn't exist
+    if (!dir.exists(Sys.getenv("R_LIBS_USER"))) {
+      dir.create(Sys.getenv("R_LIBS_USER"), recursive = TRUE)
+    }
+    
+    cat(sprintf("Installing package: %s\n", pkg))
+    install.packages(pkg, repos = "https://cloud.r-project.org", lib = Sys.getenv("R_LIBS_USER"), ...)
   }
   library(pkg, character.only = TRUE)
 }

@@ -21,6 +21,7 @@ module load r-spatial
 module load r
 
 # Set up R environment
+mkdir -p $HOME/R/library
 export R_LIBS_USER=$HOME/R/library
 
 # Create logs directory if it doesn't exist
