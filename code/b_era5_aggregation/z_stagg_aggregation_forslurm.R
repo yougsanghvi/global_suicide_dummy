@@ -9,36 +9,17 @@
 
 # ------ 1. LIBRARY MANAGEMENT ------
 
-#' Helper function to install and load CRAN packages if they are missing
-install_if_missing <- function(pkg, ...) {
-  if (!requireNamespace(pkg, quietly = TRUE)) {
-    # Set up personal library if it doesn't exist
-    if (!dir.exists(Sys.getenv("R_LIBS_USER"))) {
-      dir.create(Sys.getenv("R_LIBS_USER"), recursive = TRUE)
-    }
-    
-    cat(sprintf("Installing package: %s\n", pkg))
-    install.packages(pkg, repos = "https://cloud.r-project.org", lib = Sys.getenv("R_LIBS_USER"), ...)
-  }
-  library(pkg, character.only = TRUE)
-}
+# Load required packages (must be pre-installed)
+library(sf)        # Spatial data handling
+library(dplyr)     # Data manipulation
+library(ggplot2)   # Plotting
+library(terra)     # Raster operations
+library(crayon)    # Colored console messages
+library(tictoc)    # Code timing
+library(remotes)   # For GitHub packages
+library(stagg)     # Spatial-temporal aggregation
 
-# Install required packages
-install_if_missing("sf")        # Spatial data handling
-install_if_missing("dplyr")     # Data manipulation
-install_if_missing("ggplot2")   # Plotting
-install_if_missing("terra")     # Raster operations
-install_if_missing("crayon")    # Colored console messages
-install_if_missing("tictoc")    # Code timing
-
-# Install stagg package from GitHub
-if (!requireNamespace("stagg", quietly = TRUE)) {
-  install_if_missing("remotes")
-  remotes::install_github("tcarleton/stagg")
-}
-library(stagg)
-
-cat(crayon::green("All required packages are installed and loaded.\n"))
+cat(crayon::green("All required packages loaded.\n"))
 
 # ------ 2. CONFIGURATION ------
 

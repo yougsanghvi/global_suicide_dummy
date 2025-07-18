@@ -24,6 +24,9 @@ module load r
 mkdir -p $HOME/R/library
 export R_LIBS_USER=$HOME/R/library
 
+# Clean up any existing lock files from failed installations
+rm -rf $HOME/R/library/00LOCK-*
+
 # Create logs directory if it doesn't exist
 mkdir -p slurm_logs
 
