@@ -38,6 +38,6 @@ echo "Node: $SLURM_NODELIST"
 
 # Run R script for specific year
 echo "Starting ERA5 aggregation for year $YEAR..."
-Rscript z_stagg_aggregation_forslurm.R $YEAR
+Rscript code/b_era5_aggregation/z_stagg_aggregation_forslurm.R $YEAR
 
 echo "Completed processing year $YEAR at: $(date)"
