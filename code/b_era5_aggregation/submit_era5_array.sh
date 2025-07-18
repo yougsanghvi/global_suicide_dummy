@@ -1,17 +1,16 @@
 #!/bin/bash
 #SBATCH --job-name=era5_agg_array
-#SBATCH --account=fc_climate
-#SBATCH --partition=savio2
-#SBATCH --qos=savio_normal
+#SBATCH --account=co_carleton
+#SBATCH --partition=savio4_htc
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=4
-#SBATCH --time=12:00:00
+#SBATCH --cpus-per-task=15
+#SBATCH --time=24:00:00
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=yougsanghvi@berkeley.edu
 #SBATCH --output=slurm_logs/era5_agg_array_%A_%a.out
 #SBATCH --error=slurm_logs/era5_agg_array_%A_%a.err
-#SBATCH --array=0-25%5
+#SBATCH --array=0-25
 
 # This script processes years in parallel using SLURM job arrays
 # Array 0-25 represents 26 years (1979-2004)
