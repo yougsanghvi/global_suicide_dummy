@@ -18,7 +18,7 @@
 
 # Load required modules
 module load r-spatial
-module load r/4.3.1
+module load r
 
 # Set up R environment
 export R_LIBS_USER=$HOME/R/library
