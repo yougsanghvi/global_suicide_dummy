@@ -1,46 +1,42 @@
-# !!! this code is not complete so be cautious while running it
+# ==============================================================================
+# ERA5 Climate Data Spatial-Temporal Aggregation Script
+# ==============================================================================
+# Purpose: Aggregate hourly ERA5 temperature data to monthly county-level 
+#          averages with polynomial transformations for US counties (1979-2004)
+# 
+# Prerequisites: Load r-spatial module before running ('module load r-spatial')
+# ==============================================================================
 
-# Please load r-spatial using 'module-load r-spatial' before running this code
-
-# ------ 1. Library Management ------
-# replace some of these with pacman
+# ------ 1. LIBRARY MANAGEMENT ------
 
 #' Helper function to install and load CRAN packages if they are missing
-#'
-#' @param pkg Character string: The name of the package to install and load.
-#' @param ... Additional arguments passed to `install.packages()`.
 install_if_missing <- function(pkg, ...) {
   if (!requireNamespace(pkg, quietly = TRUE)) {
-    install.packages(
-      pkg,
-      repos = "https://cloud.r-project.org",
-      ...
-    )
+    install.packages(pkg, repos = "https://cloud.r-project.org", ...)
   }
   library(pkg, character.only = TRUE)
 }
 
-# Install and load CRAN packages essential for spatial data handling and manipulation.
-install_if_missing("sf")
-install_if_missing("dplyr")
-install_if_missing("ggplot2") # For plotting results
-install_if_missing("terra") # For raster operations
-install_if_missing("crayon") # For printing colored messages in the console
-install_if_missing("tictoc") # For timing code execution
+# Install required packages
+install_if_missing("sf")        # Spatial data handling
+install_if_missing("dplyr")     # Data manipulation
+install_if_missing("ggplot2")   # Plotting
+install_if_missing("terra")     # Raster operations
+install_if_missing("crayon")    # Colored console messages
+install_if_missing("tictoc")    # Code timing
 
-# Install `stagg` from GitHub if it's not already installed.
-# `remotes` is required to install packages directly from GitHub.
+# Install stagg package from GitHub
 if (!requireNamespace("stagg", quietly = TRUE)) {
   install_if_missing("remotes")
   remotes::install_github("tcarleton/stagg")
 }
-library(stagg) # Load the stagg package
+library(stagg)
 
 cat(crayon::green("All required packages are installed and loaded.\n"))
 
-# ------ 2. Configuration: Setting File Paths and Other Inputs ------
+# ------ 2. CONFIGURATION ------
 
-# Define the base directory for data storage.
+# File paths
 dir <- "/global/scratch/users/yougsanghvi"
 dir_tiff <- file.path(dir, "era5_hourly_by_year")
 
@@ -49,10 +45,6 @@ usa_county_dir <- file.path(dir, "shapefiles")
 usa_county_filename <- "tl_2016_us_county_mortality.shp"
 usa_county_path <- file.path(usa_county_dir, usa_county_filename)
 
-# Define the generic filename pattern for yearly NetCDF/TIFF files.
-# The `{year}` placeholder will be replaced in the loop.
-filename_pattern <- "era5_data_%d.grib" # e.g., era5_data_1979.grib
-
 # Define an output directory for the aggregated results
 output_dir <- file.path(dir, "aggregated_results_era5_usa")
 if (!dir.exists(output_dir)) {
@@ -60,53 +52,38 @@ if (!dir.exists(output_dir)) {
   message("Created output directory: ", output_dir)
 }
 
-file_format_prefix <- "era5_usa_agg_" # the year will be appended to this prefix
+# File naming patterns
+filename_pattern <- "era5_data_%d.grib"  # Input files: era5_data_YYYY.grib
+file_format_prefix <- "era5_usa_agg_"    # Output files: era5_usa_agg_YYYY.csv
+output_filepath_all_years <- file.path(output_dir, "era5_usa_agg_all_years.csv")
 
-# Define the full path for the final merged output file.
-output_filepath_all_years <- file.path(
-  output_dir,
-  "era5_usa_agg_all_years.csv"
-)
-
-# Define the range of years to process
+# Processing parameters
 start_year <- 1979
 end_year <- 2004
+overwrite <- TRUE     # Set to FALSE to skip existing files; not implemented yet, keep FALSE
+pop_weight <- TRUE    # TRUE: population-weighted, FALSE: area-weighted only
+daily <- FALSE        # TRUE if data is already daily aggregated
 
-# DO NOT CHANGE -- no overwrite functionality can be added soon...
-# ... but not already present
-overwrite <- TRUE
+# ------ 3. SPATIAL DATA PREPARATION ------
 
-# Set weighting scheme
-# TRUE: add population secondary weights, FALSE: keep only area weighted
+cat(crayon::blue("Loading and preparing county shapefile...\n"))
 
-# !!! add functionality to change file names based on this
-pop_weight <- TRUE
-
-# variable to set if data is already daily aggregated
-# set to TRUE if data is already daily aggregated
-# for eg for GDNAT data
-daily <- FALSE
-
-# ------ 3. Polygon Data Preparation (USA Counties) ------
-
-cat(crayon::blue("Calculating overlay weights...\n"))
-# Read the world county shapefile into an sf object.
+# Load US county shapefile
 usa_counties <- st_read(usa_county_path, quiet = TRUE)
-ext(usa_counties)
 
-# Ensure the Coordinate Reference System (CRS) is WGS84 (EPSG:4326) for consistency.
-
+# Ensure consistent CRS (WGS84)
 usa_counties <- sf::st_transform(usa_counties, 4326)
 
-# Fix any invalid geometries within the `usa_counties` dataset.
-# Invalid geometries can cause issues in spatial operations.
+# Fix invalid geometries
 usa_counties <- st_make_valid(usa_counties)
 
-# ------ 4. Calculate Overlay Weights ------
+# ------ 4. CALCULATE OVERLAY WEIGHTS ------
+
+cat(crayon::blue("Calculating overlay weights...\n"))
 
 if (pop_weight) {
   county_weights <- stagg::overlay_weights(
-    usa_counties,
+    usa_counties, 
     "GEOID",
     secondary_weights = pop_world_2015_era5
   )
@@ -114,23 +91,22 @@ if (pop_weight) {
   county_weights <- stagg::overlay_weights(usa_counties, "GEOID")
 }
 
-# ------ 5. Raster Data Preparation and Aggregation Across Years ------
+# ------ 5. RASTER PROCESSING AND AGGREGATION ------
 
 cat(crayon::magenta("Starting raster data processing and aggregation...\n"))
 # Initialize an empty list to store aggregated data for all years
 all_years_aggregated_data <- list()
 
-# Loop through each year, process the corresponding raster, and aggregate
+# Process each year individually
 for (year in start_year:end_year) {
-  tic("Processing year: ", year) # Start timing for the current year
-  # for each loop instead
+  tic(paste("Processing year:", year))
   message(sprintf("Processing year: %d", year))
 
-  # Construct the full path for the current year's TIFF file
+  # Construct file paths
   current_filename <- sprintf(filename_pattern, year)
   current_filepath <- file.path(dir_tiff, current_filename)
 
-  # Check if the file exists before processing
+  # Check if input file exists
   if (!file.exists(current_filepath)) {
     warning(sprintf(
       "Skipping year %d: File not found at %s",
@@ -186,23 +162,13 @@ for (year in start_year:end_year) {
     r <- terra::rotate(r)
   }
 
-  #tic("Raster extent before cropping:\n")
-  #print(ext(r)) # Print the extent of the raster
-  #toc() # Print the time taken for printing the extent
-
-  #tic("Raster cropping")
-  #r <- terra::crop(r, bbox_extent) # remove this to run whole USA -- only debugging
-  #toc() # Print the time taken for cropping
-
-  #r_crop <- r[[which(format(time(r), "%m") %in% c("01", "02"))]]
-
   # Crop the shifted raster to the extent of the USA counties polygons.
   cat("Cropping raster to USA counties...\n")
   tic("Cropping raster to USA counties")
   r_crop <- terra::crop(r, usa_counties)
   toc() # Print the time taken for cropping
 
-  # Convert temperature values from Kelvin to Celsius
+  # Convert Kelvin to Celsius
   r_crop_celsius <- r_crop - 273.15
   #cat("raster extent after cropping to USA counties:\n")
   #ext(r_crop_celsius)
@@ -235,7 +201,7 @@ for (year in start_year:end_year) {
   }
   toc() # Print the time taken for aggregation
 
-  # Add a 'year' column to the aggregated data for later combination
+  # Add year column and save
   temp_out$year <- year
 
   # Save the current year's aggregated data separately
@@ -282,19 +248,12 @@ list_of_dfs <- lapply(all_csv_files, read.csv, stringsAsFactors = FALSE)
 # Combine all data frames into a single data frame by row.
 combined_df <- do.call(rbind, list_of_dfs)
 
-# Save the combined data frame to a new CSV file.
+# Save final combined dataset
 write.csv(combined_df, output_filepath_all_years, row.names = FALSE)
 
-# Display a confirmation message.
-message(sprintf(
-  "All aggregated data merged and saved to: %s",
+cat(crayon::green(sprintf(
+  "Final aggregated dataset saved to: %s\n", 
   output_filepath_all_years
-))
+)))
 
-# !!! this code currently outputs dupicated rows.
-# this seems harmless and i am simply dropping duplicate ones
-# but this step needs to be done in analyses
-# Will need explore this issue soon
-
-# the file name also needs to be changed and the code reran
-# currently it is merging in old files
+# Note: This output may contain duplicate rows that should be removed in analysis
