@@ -4,28 +4,22 @@
 #SBATCH --partition=savio4_htc
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=15
-#SBATCH --time=24:00:00
+#SBATCH --cpus-per-task=50
+#SBATCH --time=80:00:00
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=yougsanghvi@berkeley.edu
 #SBATCH --output=slurm_logs/era5_agg_array_%A_%a.out
 #SBATCH --error=slurm_logs/era5_agg_array_%A_%a.err
-#SBATCH --array=0-25
+#SBATCH --array=0-25%5
+#SBATCH --mem-per-cpu=8G
 
 # This script processes years in parallel using SLURM job arrays
-# Array 0-25 represents 26 years (1979-2004)
-# The %5 limits to 5 concurrent jobs
+# Array 0-15 represents 26 years (1979-2004)
+# The %10 limits to 10 concurrent jobs
 
 # Load required modules
 module load r-spatial
 module load r
-
-# Set up R environment
-mkdir -p $HOME/R/library
-export R_LIBS_USER=$HOME/R/library
-
-# Clean up any existing lock files from failed installations
-rm -rf $HOME/R/library/00LOCK-*
 
 # Create logs directory if it doesn't exist
 mkdir -p slurm_logs

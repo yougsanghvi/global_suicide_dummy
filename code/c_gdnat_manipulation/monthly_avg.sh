@@ -2,7 +2,7 @@
 #SBATCH --job-name=avgmonthly_gdnat
 #SBATCH --account=co_carleton
 #SBATCH --partition=savio4_htc
-#SBATCH --array=0-41  # 1979 to 2020 inclusive → 42 years → 0 to 41
+#SBATCH --array=0-1
 #SBATCH --cpus-per-task=4
 #SBATCH --time=01:30:00
 #SBATCH --output=logs/divide_orders_%A_%a.out

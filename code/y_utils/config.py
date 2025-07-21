@@ -33,9 +33,10 @@ SUICIDE_PANEL_FP = os.path.join(
 )
 
 # === GDNat AGGREGATED FILES ===
-STAGG_FOLDER_PATH = os.path.join(SCRATCH, "aggregated_results_gdnat_usa")
+GDNAT_FOLDER_PATH = os.path.join(SCRATCH, "aggregated_results_gdnat_usa")
 STAGG_FILENAME_ALL_YEARS = "gdnat_usa_agg_all_years.csv"
-GDNAT_COUNTY_FP = os.path.join(STAGG_FOLDER_PATH, STAGG_FILENAME_ALL_YEARS)
+GDNAT_COUNTY_FP = os.path.join(GDNAT_FOLDER_PATH, STAGG_FILENAME_ALL_YEARS)
+GDNAT_FILE_FORMAT = "gdnat_usa_agg_{year}.csv"
 
 def get_gdnat_agg_yearly(year: int) -> str:
     """
@@ -43,7 +44,7 @@ def get_gdnat_agg_yearly(year: int) -> str:
     Example: get_stagg_data_path_for_year(2000) -> ".../gdnat_usa_agg_2000.csv"
     """
     filename = f"gdnat_usa_agg_{year}.csv"
-    return os.path.join(STAGG_FOLDER_PATH, filename)
+    return os.path.join(GDNAT_FOLDER_PATH, filename)
 
 # === RAW GDNAT TIFF FILES ===
 RAW_GDNAT_FOLDER = "gdnat_tiff_files_by_yr"
@@ -78,11 +79,20 @@ ERA5_DD_FP = os.path.join(SCRATCH, ERA5_DD_FOLDER, ERA5_DD_FILENAME)
 ERA5_RAW_FOLDER = os.path.join(SCRATCH, "era5_hourly_by_year")
 def get_era5_raw_yearly(year: int) -> str:
     """
-    Returns the full path to a raw ERA5 .zarr file for a specific year.
-    Example: get_era5_raw_zarr_path_for_year(2020) -> ".../era5_hourly_by_year/era5_2020.zarr"
+    Returns the full path to a raw ERA5 file for a specific year.
     """
     filename = f"era5_data_{year}.grib"
     return os.path.join(ERA5_RAW_FOLDER, filename)
+
+# === ERA5 AGGREGATED FILES ===
+ERA5_AGG_FOLDER = os.path.join(SCRATCH, "aggregated_results_era5_usa")
+ERA5_AGG_FILE_FORMAT = "era5_usa_agg_{year}.csv"
+def get_era5_agg_yearly(year: int) -> str:
+    """
+    Returns the full path to a aggregated ERA5 file for a specific year.
+    """
+    filename = f"era5_usa_agg_{year}.csv"
+    return os.path.join(ERA5_AGG_FOLDER, filename)
 
 # === ERA5 DAILY AGGREGATED FILES ===
 ERA5_DAILY_FOLDER = os.path.join(SCRATCH, "era5_daily_by_year")

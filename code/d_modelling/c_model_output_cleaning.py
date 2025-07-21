@@ -1,3 +1,6 @@
+## Needs to be updated with new file format 
+# there is no longer yhat gdnat and yhat era5
+
 ## libraries and File Paths
 import os
 import pandas as pd

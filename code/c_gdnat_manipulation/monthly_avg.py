@@ -17,7 +17,8 @@ from y_utils import config
 
 # ========= USER INPUTS ========= #
 start_year = 1979
-end_year = 2020
+end_year = 1979
+data = 'era5'  # 'gdnat' or 'era5'
 # =============================== #
 
 def get_days_in_month(year, month):
@@ -34,13 +35,17 @@ def safe_days_in_month(row):
         return pd.NA
 
 def process_file(year):
-    file_path = config.get_gdnat_agg_yearly(year)
+    if(data == 'gdnat'):
+        file_path = config.get_gdnat_agg_yearly(year)
+    elif(data == 'era5'):
+        file_path = config.get_era5_agg_yearly(year)
 
     if not os.path.exists(file_path):
         print(f"[WARNING] File not found: {file_path}")
         return
 
     print(f"[INFO] Processing year: {year}")
+    print(f"[INFO] File exists: {file_path}" if os.path.exists(file_path) else f"[WARNING] File not found: {file_path}")
     df_orig = pd.read_csv(file_path)
     orig_nrows = len(df_orig)
 
@@ -81,6 +86,9 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
+        print(f"[DEBUG] sys.argv[1]: '{sys.argv[1]}' (type: {type(sys.argv[1])})")
+        print(f"[DEBUG] sys.argv[2]: '{sys.argv[2]}' (type: {type(sys.argv[2])})")
+        
         base_year = int(sys.argv[1])
         offset = int(sys.argv[2])
         year = base_year + offset
@@ -89,5 +97,6 @@ if __name__ == "__main__":
             process_file(year)
         else:
             print(f"[ERROR] Computed year {year} is out of range ({start_year}-{end_year})")
-    except ValueError:
+    except ValueError as e:
+        print(f"[ERROR] ValueError caught: {e}")
         print(f"[ERROR] Invalid input: {sys.argv[1]} {sys.argv[2]}")

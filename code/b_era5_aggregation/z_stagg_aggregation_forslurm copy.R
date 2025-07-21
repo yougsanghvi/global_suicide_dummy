@@ -121,7 +121,7 @@ if (!file.exists(current_filepath)) {
 if (!overwrite && file.exists(output_filepath)) {
   message(sprintf("Output file already exists: %s", output_filepath))
   message("Set overwrite=TRUE to regenerate or delete the existing file.")
-  quit(status = 0)
+  # quit(status = 0)
 }
 
 # Load and process raster data
@@ -130,8 +130,12 @@ r <- terra::rast(current_filepath)
 
 # Rotate longitude if needed (0-360 to -180-180)
 if (terra::xmax(r) > 190) {
+  print("correcting lat long coordinates")
   r <- terra::rotate(r)
 }
+
+# Crop using extent (bounding box only, much faster)
+cropped_r <- terra::crop(r, terra::ext(usa_counties))
 
 # Crop to US counties extent
 cat("Cropping raster to USA counties...\n")

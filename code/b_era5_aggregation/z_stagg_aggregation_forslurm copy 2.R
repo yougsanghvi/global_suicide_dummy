@@ -121,12 +121,12 @@ if (!file.exists(current_filepath)) {
 if (!overwrite && file.exists(output_filepath)) {
   message(sprintf("Output file already exists: %s", output_filepath))
   message("Set overwrite=TRUE to regenerate or delete the existing file.")
-  quit(status = 0)
+  # quit(status = 0)
 }
 
 # Load and process raster data
 cat(sprintf("Reading raster data for %d...\n", year))
-r <- terra::rast(current_filepath)
+r <- terra::vrt(current_filepath)
 
 # Rotate longitude if needed (0-360 to -180-180)
 if (terra::xmax(r) > 190) {
@@ -135,7 +135,16 @@ if (terra::xmax(r) > 190) {
 
 # Crop to US counties extent
 cat("Cropping raster to USA counties...\n")
-r_crop <- terra::crop(r, usa_counties)
+xmin <- -125
+xmax <- -66
+ymin <- 24
+ymax <- 50
+
+# Create extent
+bbox_ext <- terra::ext(xmin, xmax, ymin, ymax)
+
+# Crop raster by this bbox
+r_cropped <- terra::crop(r, bbox_ext)
 
 # Convert Kelvin to Celsius
 r_crop_celsius <- r_crop - 273.15

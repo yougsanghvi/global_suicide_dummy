@@ -25,6 +25,10 @@ get_gdnat_agg_yearly <- function(year) {
   file.path(STAGG_FOLDER_PATH, sprintf("gdnat_usa_agg_%d.csv", year))
 }
 
+get_era5_agg_yearly <- function(year) {
+  file.path(STAGG_FOLDER_PATH, sprintf("era5_usa_agg_%d.csv", year))
+}
+
 # Raw GDNAT TIFF
 RAW_GDNAT_FOLDER <- file.path(SCRATCH, "gdnat_tiff_files_by_yr")
 get_gdnat_raw_yearly <- function(year) {
