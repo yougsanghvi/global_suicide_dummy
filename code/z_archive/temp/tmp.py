@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 # Define output directory and file name
-output_dir = "/global/scratch/projects/co_carleton"
+output_dir = "/global/scratch/projects/co_carleton/carleton_colab"
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 filename = f"random_data_{timestamp}.csv"
 output_path = os.path.join(output_dir, filename)

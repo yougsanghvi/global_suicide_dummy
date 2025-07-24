@@ -4,7 +4,7 @@
 #SBATCH --partition=savio4_htc
 #SBATCH --time=6:00:00
 #SBATCH --cpus-per-task=5
-#SBATCH --array=0-1
+#SBATCH --array=0-30
 #SBATCH --output=slurm_logs/%A_%a.out
 #SBATCH --error=slurm_logs/%A_%a.err
 #SBATCH --mail-user=yougsanghvi@berkeley.edu

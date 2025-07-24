@@ -32,8 +32,26 @@ library(stagg)     # Spatial-temporal aggregation
 
 cat(crayon::green("All required packages loaded.\n"))
 
+library(pryr)  # for mem_used()
+
+print_memory <- function(label = "") {
+  gc()
+  used <- pryr::mem_used()
+  if (used > 1e9) {
+    mem_str <- sprintf("%.2f GB", used / 1e9)
+  } else if (used > 1e6) {
+    mem_str <- sprintf("%.2f MB", used / 1e6)
+  } else {
+    mem_str <- sprintf("%.2f kB", used / 1e3)
+  }
+  cat(sprintf("[%s] Memory used: %s\n", label, mem_str))
+}
+
+
+
 # ------ 2. CONFIGURATION ------
 
+print_memory("Start of script")
 # File paths
 dir <- "/global/scratch/users/yougsanghvi"
 dir_tiff <- file.path(dir, "era5_hourly_by_year")
@@ -75,6 +93,8 @@ overwrite <- FALSE     # Set to FALSE to skip existing files
 pop_weight <- TRUE    # TRUE: population-weighted, FALSE: area-weighted only
 daily <- FALSE        # TRUE if data is already daily aggregated
 
+print_memory("After configuration")
+
 # ------ 3. SPATIAL DATA PREPARATION ------
 
 cat(crayon::blue("Loading and preparing county shapefile...\n"))
@@ -83,10 +103,12 @@ cat(crayon::blue("Loading and preparing county shapefile...\n"))
 usa_counties <- st_read(usa_county_path, quiet = TRUE)
 
 # Ensure consistent CRS (WGS84)
-usa_counties <- sf::st_transform(usa_counties, 4326)
+# usa_counties <- sf::st_transform(usa_counties, 4326)
 
 # Fix invalid geometries
-usa_counties <- st_make_valid(usa_counties)
+# usa_counties <- st_make_valid(usa_counties)
+
+print_memory("After loading USA counties shapefile")
 
 # ------ 4. CALCULATE OVERLAY WEIGHTS ------
 
@@ -102,21 +124,25 @@ if (pop_weight) {
   county_weights <- stagg::overlay_weights(usa_counties, "GEOID")
 }
 
+print_memory("After calculating overlay weights")
+
 # ------ 5. RASTER PROCESSING AND AGGREGATION ------
 
 cat(crayon::magenta(sprintf("Processing year %d...\n", year)))
-
+cat("\t constructing file paths")
 # Construct file paths
 current_filename <- sprintf(filename_pattern, year)
 current_filepath <- file.path(dir_tiff, current_filename)
 output_filename <- sprintf("%s%d.csv", file_format_prefix, year)
 output_filepath <- file.path(output_dir, output_filename)
 
+cat("\t checking input file paths")
 # Check if input file exists
 if (!file.exists(current_filepath)) {
   stop(sprintf("Input file not found: %s", current_filepath))
 }
 
+cat("\t checking output file paths")
 # Check if output file exists and if overwrite is FALSE
 if (!overwrite && file.exists(output_filepath)) {
   message(sprintf("Output file already exists: %s", output_filepath))
@@ -124,28 +150,68 @@ if (!overwrite && file.exists(output_filepath)) {
   quit(status = 0)
 }
 
+print_memory("before reading raster data")
+
 # Load and process raster data
 cat(sprintf("Reading raster data for %d...\n", year))
 r <- terra::rast(current_filepath)
 
+print_memory("After reading raster data")
+
 # Rotate longitude if needed (0-360 to -180-180)
 if (terra::xmax(r) > 190) {
+  print("correcting lat long coordinates")
   r <- terra::rotate(r)
 }
 
-# Crop to US counties extent
-cat("Cropping raster to USA counties...\n")
-r_crop <- terra::crop(r, usa_counties)
+if (is.na(crs(r, describe = TRUE)$code) || crs(r, describe = TRUE)$code != 4326) {
+  message("Reprojecting raster to EPSG:4326 (WGS 84)...")
+  r <- project(r, "EPSG:4326")
+} else {
+  message("Raster is already in WGS 84 (EPSG:4326).")
+}
+
+# ways to make cropping faster:
+
+# Method 1: (not as fast but very scaleable)
+# Crop using extent (bounding box only)
+# this also fails due to memory issues 
+# cat("Cropping raster to USA counties using ext...\n")
+# r_crop <- terra::crop(r, terra::ext(usa_counties))
+
+# Method 2: Manual bbox (removed ext overhead)
+# xmin <- -125
+# xmax <- -66
+# ymin <- 24
+# ymax <- 50
+# Create extent
+# bbox_ext <- terra::ext(xmin, xmax, ymin, ymax)
+# Crop raster by this bbox
+# r_cropped <- terra::crop(r, bbox_ext)
+ 
+# Initial Method: Crop to US counties extent
+# cat("Cropping raster to USA counties using ext...\n")
+
+#print_memory("Before cropping raster data")
+#tic("Cropping raster data to USA counties extent")
+r_crop <- terra::crop(r, terra::vect(usa_counties))
+#toc()
+#print_memory("After cropping raster data")
 
 # Convert Kelvin to Celsius
-r_crop_celsius <- r_crop - 273.15
+# cat("converting raster data from Kelvin to Celsius...\n")
+# r_crop_celsius <- r_crop - 273.15
+
+# print_memory("After converting to Celsius")
 
 # Run spatial-temporal aggregation
 cat("Running stagg aggregation...\n")
 tic("Stagg aggregation")
+
+print_memory("Before stagg aggregation")
 if (!daily) {
   temp_out <- stagg::staggregate_polynomial(
-    data = r_crop_celsius,
+    data = r, # must change name here if crop code is uncommented
     overlay_weights = county_weights,
     daily_agg = "average",
     time_agg = "month",
@@ -155,7 +221,7 @@ if (!daily) {
   )
 } else {
   temp_out <- stagg::staggregate_polynomial(
-    data = r_crop_celsius,
+    data = r, # must change name here if crop code is uncommented
     overlay_weights = county_weights,
     start_date = sprintf("%d-01-01 00:00:00", year),
     time_interval = "24 hour",
@@ -165,6 +231,8 @@ if (!daily) {
   )
 }
 toc() # End of aggregation
+
+print_memory("After stagg aggregation")
 
 # Add year column and save
 temp_out$year <- year

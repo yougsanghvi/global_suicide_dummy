@@ -17,7 +17,7 @@ from y_utils import config
 
 # ========= USER INPUTS ========= #
 start_year = 1979
-end_year = 1979
+end_year = 2005
 data = 'era5'  # 'gdnat' or 'era5'
 # =============================== #
 
@@ -63,11 +63,15 @@ def process_file(year):
     if na_months > 0:
         print(f"[WARNING] {na_months} rows have missing or invalid month/year in {file_path}. order_x_avg will be NA for these rows.")
 
-    # Compute and store avg columns
+    # Compute and store avg columns only if they don't already exist
     for i in range(1, 5):
         col = f'order_{i}'
         avg_col = f'{col}_avg'
-        df[avg_col] = df[col] / df['days_in_month']
+        if avg_col not in df.columns:
+            df[avg_col] = df[col] / df['days_in_month']
+        else:
+            print(f"[INFO] Skipping {avg_col}, already exists in file.")
+
 
     df.drop(columns='days_in_month', inplace=True)
 
