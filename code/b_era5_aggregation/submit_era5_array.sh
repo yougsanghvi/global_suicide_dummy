@@ -37,4 +37,5 @@ echo "Node: $SLURM_NODELIST"
 echo "Starting ERA5 aggregation for year $YEAR..."
 Rscript code/b_era5_aggregation/z_stagg_aggregation_forslurm_yrlyandpoly.R $YEAR
 
-echo "Completed processing year $YEAR at: $(date)"
+echo "The script for year $YEAR terminated at: $(date). Please check the error logs and output folder to verify successful completion."
+# End of script

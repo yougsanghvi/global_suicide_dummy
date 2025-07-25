@@ -6,6 +6,14 @@
 #
 # Prerequisites: Load r-spatial module before running ('module load r-spatial')
 # ==============================================================================
+options(
+  warning.length = 8170,  # Increase max length if needed
+  warning.expression = quote({
+    warning_message <- geterrmessage()
+    cat("[WARNING] ", warning_message, "\n", file=stderr())
+    flush.console()
+  })
+)
 
 invisible(
   .libPaths(
@@ -82,7 +90,7 @@ if (length(args) > 0) {
     year
   )))
 } else {
-  year <- 1979 # Default for standalone execution
+  year <- 1989 # Default for standalone execution
   cat(crayon::yellow(
     "No command line argument provided, using default year 1979\n"
   ))
@@ -157,10 +165,11 @@ if (terra::xmax(r) > 190) {
 results_list <- list()
 
 for (i in seq_len(nrow(usa_counties))) {
-  if (i > 5) {
+  if (i > 2) {
     break
   }
 
+  tic("Processing county: ", i) # Start timing for the current county
   county <- usa_counties[i, ]
   county_id <- county$GEOID
   cat(sprintf(
@@ -170,6 +179,7 @@ for (i in seq_len(nrow(usa_counties))) {
     nrow(usa_counties)
   ))
 
+  cat("calculating overlay weights for county ", county_id, "\n")
   # Calculate overlay weights
   overlay_weights <- tryCatch(
     {
@@ -198,6 +208,7 @@ for (i in seq_len(nrow(usa_counties))) {
     next
   }
 
+  cat("cropping raster to county ", county_id, "\n")
   # Crop raster to county
   r_crop <- tryCatch(
     {
@@ -214,6 +225,7 @@ for (i in seq_len(nrow(usa_counties))) {
     next
   }
 
+  cat("running staggregate_polynomial for county ", county_id, "\n")
   # Run staggregate_polynomial with daily conditional
   county_result <- tryCatch(
     {
@@ -256,6 +268,9 @@ for (i in seq_len(nrow(usa_counties))) {
   }
 
   print_memory(sprintf("After county %s", county_id))
+  flush.console()
+
+  toc() # End timing for the current county
 }
 
 # Combine results and save
