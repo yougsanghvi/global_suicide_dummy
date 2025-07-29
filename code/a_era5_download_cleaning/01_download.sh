@@ -2,7 +2,7 @@
 #SBATCH --job-name=dta-download
 #SBATCH --account=co_carleton
 #SBATCH --partition=savio4_htc
-#SBATCH --time=1:00:00
+#SBATCH --time=7:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5

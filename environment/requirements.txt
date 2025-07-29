@@ -38,3 +38,4 @@ cdsapi
 rioxarray>=0.15.0
 nbimporter
 termcolor
+pygrib

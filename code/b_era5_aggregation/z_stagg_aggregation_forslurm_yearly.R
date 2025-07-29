@@ -164,12 +164,12 @@ if (terra::xmax(r) > 190) {
   r <- terra::rotate(r)
 }
 
-if (is.na(crs(r, describe = TRUE)$code) || crs(r, describe = TRUE)$code != 4326) {
-  message("Reprojecting raster to EPSG:4326 (WGS 84)...")
-  r <- project(r, "EPSG:4326")
-} else {
-  message("Raster is already in WGS 84 (EPSG:4326).")
-}
+#if (is.na(crs(r, describe = TRUE)$code) || crs(r, describe = TRUE)$code != 4326) {
+#  message("Reprojecting raster to EPSG:4326 (WGS 84)...")
+#  r <- project(r, "EPSG:4326")
+#} else {
+#  message("Raster is already in WGS 84 (EPSG:4326).")
+#}
 
 # ways to make cropping faster:
 
@@ -200,7 +200,7 @@ r_crop <- terra::crop(r, terra::vect(usa_counties))
 
 # Convert Kelvin to Celsius
 # cat("converting raster data from Kelvin to Celsius...\n")
-# r_crop_celsius <- r_crop - 273.15
+r_crop_celsius <- r_crop - 273.15
 
 # print_memory("After converting to Celsius")
 
@@ -211,7 +211,7 @@ tic("Stagg aggregation")
 print_memory("Before stagg aggregation")
 if (!daily) {
   temp_out <- stagg::staggregate_polynomial(
-    data = r, # must change name here if crop code is uncommented
+    data = r_crop_celsius, # must change name here if crop code is uncommented
     overlay_weights = county_weights,
     daily_agg = "average",
     time_agg = "month",
@@ -221,7 +221,7 @@ if (!daily) {
   )
 } else {
   temp_out <- stagg::staggregate_polynomial(
-    data = r, # must change name here if crop code is uncommented
+    data = r_crop_celsius, # must change name here if crop code is uncommented
     overlay_weights = county_weights,
     start_date = sprintf("%d-01-01 00:00:00", year),
     time_interval = "24 hour",

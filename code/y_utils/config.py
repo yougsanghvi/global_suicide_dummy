@@ -38,7 +38,7 @@ STAGG_FILENAME_ALL_YEARS = "gdnat_usa_agg_all_years.csv"
 GDNAT_COUNTY_FP = os.path.join(GDNAT_FOLDER_PATH, STAGG_FILENAME_ALL_YEARS)
 GDNAT_FILE_FORMAT = "gdnat_usa_agg_{year}.csv"
 
-def get_gdnat_agg_yearly(year: int) -> str:
+def get_gdnat_agg_yearly_old(year: int) -> str:
     """
     Returns the full path to the STAGG aggregated CSV file for a specific year.
     Example: get_stagg_data_path_for_year(2000) -> ".../gdnat_usa_agg_2000.csv"
@@ -57,7 +57,7 @@ def get_gdnat_raw_yearly(year: int) -> str:
     filename = f"gdnat_{year}.tif"
     return os.path.join(SCRATCH, RAW_GDNAT_FOLDER, filename)
 
-# === RAW GDNAT ZARR FILES ===
+# === OLD RAW GDNAT ZARR FILES ===
 GDNAT_ZARR_DIR = os.path.join(SCRATCH, "global_suicide")
 
 GDNAT_ZARR_1979_1999_FP = os.path.join(
@@ -110,3 +110,32 @@ ERA5_COUNTY_AREA_FP = os.path.join(
     "data", "climatedata", "USA",
     "usa_area_era5_temp_average_1968_2004_polynomial_5_area_crop_weights.csv"
 )
+
+# === CONDO PATH ===
+CONDO_PATH = "/global/scratch/projects/co_carleton/carleton_colab" 
+CONDO_DATA_DIR = os.path.join(CONDO_PATH, "data")
+
+# === Raw GDNat Paths ===
+GDNAT_DIR = os.path.join(CONDO_DATA_DIR, "gdnat_allmodels_Jul24")
+GDNAT_DATA_FP = os.path.join(GDNAT_DIR, "gdnat_tas_1979-2020_v2025-02-11.zarr")
+
+# === GDNAT TIFF OUTPUT PATHS ===
+GDNAT_TIFF_OUTPUT_DIR = os.path.join(GDNAT_DIR, "tiff_by_yr_model")
+
+# === GDNat Aggregated All Models ===
+GDNAT_USA_AGG_ALL_MODELS_FP = os.path.join(
+    GDNAT_DIR, "aggregated", "usa_pop_county"
+)
+
+# GDNat getter new
+
+def get_gdnat_agg_yearly(year: int, model: str) -> str:
+    """
+    Returns the full path to the STAGG aggregated CSV file for a specific year.
+    Example: get_stagg_data_path_for_year(2000) -> ".../gdnat_usa_agg_2000.csv"
+    """
+    filename = f"gdnat_usa_agg_{model}_{year}.csv"
+    return os.path.join(GDNAT_USA_AGG_ALL_MODELS_FP, model, filename)
+
+# Project folder 
+PROJECT_FOLDER = os.path.join(CONDO_PATH, "global_suicide")

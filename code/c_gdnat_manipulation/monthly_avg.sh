@@ -13,7 +13,7 @@ module purge  # Clean environment
 cd ~/global_suicide_dummy  # Change to your project directory
 
 BASE_YEAR=1979
-SCRIPT_PATH="code/c_gdnat_manipulation/monthly_avg.py"  
+SCRIPT_PATH="code/c_gdnat_manipulation/monthly_avg_allmodels.py"  
 
 source ./climate-env/bin/activate  # Activate virtual environment
 echo "Using Python: $(which python)"

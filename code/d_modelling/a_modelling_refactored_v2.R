@@ -14,6 +14,10 @@ install_if_missing <- function(pkg, ...) {
     library(pkg, character.only = TRUE)
 }
 
+source(
+    "/global/home/users/yougsanghvi/global_suicide_dummy/code/y_utils/config.R"
+)
+
 install_if_missing("crayon")
 cat(blue("loading required datasets and libraries \n"))
 install_if_missing("dplyr")
@@ -31,16 +35,16 @@ install_if_missing("stringr")
 # Set file paths
 dir_path <- "/global/scratch/users/yougsanghvi"
 
-gdnat_folder <- "aggregated_results_gdnat_usa"
-gdnat_file_name <- "gdnat_usa_agg_1979_2004.csv"
-gdnat_file_path <- file.path(dir_path, gdnat_folder, gdnat_file_name)
+gdnat_file_path <- file.path(
+    GDNAT_USA_AGG_ALL_MODELS_FP,
+    "ACCESS-CM2",
+    "gdnat_usa_agg_ACCESS-CM2_1979_2004.csv"
+)
 
 regression_beta_fn <- "regression_coefficients_USA_poly4_lag11.csv"
 regression_beta_fp <- file.path(dir_path, regression_beta_fn)
 
-era5_folderpath <- file.path("merged", "USA")
-era5_filename <- "USA_adm2_1968_2004_monthly.dta"
-era5_filepath <- file.path(dir_path, era5_folderpath, era5_filename)
+era5_filepath <- file.path(ERA5_AGG_FOLDER, "era5_usa_agg_1979_2004.csv")
 
 # Define paths for usa county shapefile
 usa_county_dir <- file.path(dir_path, "shapefiles")
@@ -53,12 +57,12 @@ geocode_filename <- "geocode_91_93.csv"
 geocode_filepath <- file.path(dir_path, geocode_folder, geocode_filename)
 
 # output path
-output_path <- file.path(dir_path, "gdnat_era5_compare_output")
+output_path <- file.path(PROJECT_FOLDER, "gdnat_era5_compare_output")
 
 # Load the required datasets
 gdnat_data <- read.csv(gdnat_file_path)
 regression_betas <- read.csv(regression_beta_fp)
-era5_data <- readstata13::read.dta13(era5_filepath)
+era5_data <- read.csv(era5_filepath)
 usa_shapefile <- st_read(usa_county_path)
 geocode_file <- read.csv(geocode_filepath)
 

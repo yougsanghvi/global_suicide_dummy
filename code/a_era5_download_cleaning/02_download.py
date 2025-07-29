@@ -41,9 +41,10 @@ data_folder = os.path.join(data_dir, "era5_hourly_by_year")
 os.makedirs(data_folder, exist_ok=True)
 os.makedirs(log_path, exist_ok=True)
 
-start_year = 1989
-end_year = 1990
+start_year = 1992
+end_year = 1992
 years = list(range(start_year, end_year + 1))
+overwrite = True
 
 MAX_WORKERS = 3  # Adjust number of parallel threads as needed
 
@@ -53,7 +54,7 @@ def download_era5_year(year):
     fp = os.path.join(data_folder, fn)
     log_fp = os.path.join(log_path, f"era5_download_{year}.log")
 
-    if os.path.exists(fp):
+    if os.path.exists(fp) and overwrite == False:
         print(f"[SKIP] {fn} already exists.")
         return
 

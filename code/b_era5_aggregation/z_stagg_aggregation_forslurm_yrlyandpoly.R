@@ -7,10 +7,10 @@
 # Prerequisites: Load r-spatial module before running ('module load r-spatial')
 # ==============================================================================
 options(
-  warning.length = 8170,  # Increase max length if needed
+  warning.length = 8170, # Increase max length if needed
   warning.expression = quote({
     warning_message <- geterrmessage()
-    cat("[WARNING] ", warning_message, "\n", file=stderr())
+    cat("[WARNING] ", warning_message, "\n", file = stderr())
     flush.console()
   })
 )
@@ -25,6 +25,9 @@ invisible(
     )
   )
 )
+
+source("/global/home/users/yougsanghvi/global_suicide_dummy/code/y_utils/config.R")
+
 
 # ------ 1. LIBRARY MANAGEMENT ------
 
@@ -59,9 +62,27 @@ print_memory <- function(label = "") {
 # ------ 2. CONFIGURATION ------
 
 print_memory("Start of script")
+
 # File paths
+# Set data source manually here
+DATA_SOURCE <- "era5"  # or "gdnat"
+is_era5 <- DATA_SOURCE == "era5"
+
 dir <- "/global/scratch/users/yougsanghvi"
-dir_tiff <- file.path(dir, "era5_hourly_by_year")
+if (is_era5) {
+  dir_tiff <- ERA5_RAW_FOLDER
+  filename_pattern <- "era5_data_%d.grib"
+  file_format_prefix <- "era5_usa_agg_"
+  output_dir <- ERA5_AGG_FOLDER
+  daily <- FALSE
+} else {
+  # modify this to represent new per model structure 
+  dir_tiff <- file.path(dir, "gdnat_hourly_by_year")
+  filename_pattern <- "gdnat_data_%d.nc"
+  file_format_prefix <- "gdnat_usa_agg_"
+  output_dir <- file.path(dir, "aggregated_results_gdnat_usa")
+  daily <- TRUE
+}
 
 # Define paths for usa county shapefile.
 usa_county_dir <- file.path(dir, "shapefiles")
@@ -69,16 +90,12 @@ usa_county_filename <- "tl_2016_us_county_mortality.shp"
 usa_county_path <- file.path(usa_county_dir, usa_county_filename)
 
 # Define an output directory for the aggregated results
-output_dir <- file.path(dir, "aggregated_results_era5_usa")
 if (!dir.exists(output_dir)) {
   dir.create(output_dir, recursive = TRUE)
   message("Created output directory: ", output_dir)
 }
 
-# File naming patterns
-filename_pattern <- "era5_data_%d.grib" # Input files: era5_data_YYYY.grib
-file_format_prefix <- "era5_usa_agg_" # Output files: era5_usa_agg_YYYY.csv
-output_filepath_all_years <- file.path(output_dir, "era5_usa_agg_all_years.csv")
+output_filepath_all_years <- file.path(output_dir, paste0(file_format_prefix, "all_years.csv"))
 
 # Processing parameters
 # Get year from command line argument or use default
@@ -119,12 +136,12 @@ usa_counties <- sf::st_transform(usa_counties, 4326)
 
 # Fix invalid geometries
 usa_counties <- st_make_valid(usa_counties)
+print(ext(usa_counties))
+print(sf::st_crs(usa_counties))
 
 print_memory("After loading USA counties shapefile")
 
-# ------ 4. CALCULATE OVERLAY WEIGHTS ------
-
-# ------ 5. RASTER PROCESSING AND AGGREGATION ------
+# ------ 4. RASTER PROCESSING AND AGGREGATION ------
 
 cat(crayon::magenta(sprintf("Processing year %d...\n", year)))
 cat("\t constructing file paths")
@@ -140,7 +157,7 @@ if (!file.exists(current_filepath)) {
   stop(sprintf("Input file not found: %s", current_filepath))
 }
 
-cat("\t checking output file paths")
+cat("\t checking output file paths \n")
 # Check if output file exists and if overwrite is FALSE
 if (!overwrite && file.exists(output_filepath)) {
   message(sprintf("Output file already exists: %s", output_filepath))
@@ -154,6 +171,9 @@ print_memory("before reading raster data")
 cat(sprintf("Reading raster data for %d...\n", year))
 r <- terra::rast(current_filepath)
 
+print(ext(r))
+print(sf::st_crs(r))
+
 print_memory("After reading raster data")
 
 # Rotate longitude if needed (0-360 to -180-180)
@@ -165,13 +185,18 @@ if (terra::xmax(r) > 190) {
 results_list <- list()
 
 for (i in seq_len(nrow(usa_counties))) {
-  if (i > 2) {
-    break
-  }
+  # if (i > 1) {
+  #  break
+  # }
 
   tic("Processing county: ", i) # Start timing for the current county
   county <- usa_counties[i, ]
   county_id <- county$GEOID
+
+  print(sprintf("county-level shapefile details for ", county_id))
+  print(ext(county))
+  print(sf::st_crs(county))
+
   cat(sprintf(
     "=== Processing county %s (%d of %d) ===\n",
     county_id,
@@ -203,15 +228,28 @@ for (i in seq_len(nrow(usa_counties))) {
     }
   )
 
+  class(overlay_weights)
+  print(overlay_weights)
+
   if (is.null(overlay_weights) || nrow(overlay_weights) == 0) {
     warning(sprintf("No valid overlay weights for %s, skipping.", county_id))
     next
   }
 
+  cat("dimensions of raster before cropping:\n")
+  print(ext(r))
+  print(sf::st_crs(r))
+  cat("dimensions of county before cropping:\n")
+  print(ext(county))
+  print(sf::st_crs(county))
+  
   cat("cropping raster to county ", county_id, "\n")
+  tic("time taken to crop raster")
   # Crop raster to county
   r_crop <- tryCatch(
     {
+      cat("inside tryCatch for cropping raster\n")
+      # terra::crop(r, terra::vect(county))
       terra::crop(r, terra::vect(county))
     },
     error = function(e) {
@@ -224,6 +262,11 @@ for (i in seq_len(nrow(usa_counties))) {
     warning(sprintf("Skipping county %s due to failed raster crop.", county_id))
     next
   }
+  toc() # End timing for the raster crop
+
+  print(ext(r_crop))
+  print(sf::st_crs(r_crop))
+  terra::spatSample(r_crop, size = 5, method = "regular", values = TRUE)
 
   cat("running staggregate_polynomial for county ", county_id, "\n")
   # Run staggregate_polynomial with daily conditional
@@ -262,11 +305,17 @@ for (i in seq_len(nrow(usa_counties))) {
   )
 
   if (!is.null(county_result) && nrow(county_result) > 0) {
+    cat("county result is good!\n")
+    print(county_result)
     county_result$GEOID <- county_id
     county_result$year <- year
     results_list[[length(results_list) + 1]] <- county_result
+  } else {
+    cat("county result is not good")
+    print(county_result)
   }
 
+  print(county_result)
   print_memory(sprintf("After county %s", county_id))
   flush.console()
 
