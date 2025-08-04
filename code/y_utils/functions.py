@@ -1,19 +1,104 @@
 import pandas as pd
 
-def filter_and_avg(df, county_id_col, value_col, time_col=None, start_time=None, end_time=None):
+import pandas as pd
+
+def filter_and_avg_by_year(df, county_id_col, value_col, time_col=None, start_time=None, end_time=None, agg_method='mean', pop_col=None):
     """
-    Filter dataframe by time range (if provided) and return average of value_col grouped by county_id_col.
+    Filters and aggregates a value column from a dataframe over time.
+
+    Parameters:
+    - df (pd.DataFrame): Input dataframe.
+    - county_id_col (str): Column identifying the county.
+    - value_col (str): Column containing the values to be aggregated.
+    - time_col (str, optional): Column indicating time (e.g., 'year', 'period').
+    - start_time, end_time (int or str, optional): Time window for filtering.
+    - agg_method (str): 'mean' or 'sum'.
+    - pop_col (str, optional): If specified, perform population-weighted aggregation using this column.
+
+    Returns:
+    - pd.DataFrame: Aggregated dataframe with average or sum by time.
+    """
+    print(f"Running filter_and_avg for value_col = '{value_col}' (agg_method = {agg_method}, pop_col = {pop_col})")
+
+    df = df.copy()
+
+    # Filter by time range if specified
+    if time_col:
+        try:
+            df[time_col] = pd.to_datetime(df[time_col], errors='coerce')
+            start = pd.to_datetime(start_time) if start_time is not None else None
+            end = pd.to_datetime(end_time) if end_time is not None else None
+        except Exception:
+            try:
+                df[time_col] = pd.to_numeric(df[time_col], errors='coerce')
+                start = float(start_time) if start_time is not None else None
+                end = float(end_time) if end_time is not None else None
+            except Exception as e:
+                print(f"❌ Error parsing time columns or values: {e}")
+                return None
+
+        if start is not None:
+            print(f"Filtering data between {start_time} and {end_time} on column '{time_col}'...")
+            df = df[df[time_col] >= start]
+        if end is not None:
+            df = df[df[time_col] <= end]
+
+        if df.empty:
+            print("❌ No data found in specified time range after filtering.")
+            return None
+    else:
+        print("No time range provided, aggregating over entire dataset period...")
+
+    # If population column is specified, use it for weighted aggregation
+    if pop_col:
+        before_drop = len(df)
+        df = df.dropna(subset=[value_col, pop_col])
+        after_drop = len(df)
+        print(f"Dropped {before_drop - after_drop} rows due to NA in {value_col} or {pop_col}")
+
+        df["weighted_value"] = df[value_col] * df[pop_col]
+        grouped = df.groupby(time_col).agg(
+            weighted_sum=("weighted_value", "sum"),
+            weight=(pop_col, "sum")
+        )
+
+        if agg_method == 'mean':
+            result = (grouped["weighted_sum"] / grouped["weight"]).reset_index(name=value_col)
+        elif agg_method == 'sum':
+            print(f"❌ Invalid aggregation method '{agg_method}' with population weighting.")
+        else:
+            print(f"❌ Invalid aggregation method '{agg_method}' with population weighting.")
+            return None
+    else:
+        if agg_method == 'mean':
+            print("Aggregating using MEAN...")
+            # doing this group by might break the maps which require sum over time 
+            result = df.groupby(time_col)[value_col].mean().reset_index()
+        elif agg_method == 'sum':
+            print("Aggregating using SUM...")
+            result = df.groupby(time_col)[value_col].sum().reset_index()
+        else:
+            print(f"❌ Invalid aggregation method '{agg_method}'. Use 'mean' or 'sum'.")
+            return None
+
+    return result
+
+
+def filter_and_avg_by_county(df, county_id_col, value_col, time_col=None, start_time=None, end_time=None, agg_method='mean'):
+    """
+    Filter dataframe by time range (if provided) and return aggregated value_col grouped by county_id_col.
 
     Parameters:
     - df: pandas DataFrame
     - county_id_col: column name for county ID in df
-    - value_col: column name for the value to average
+    - value_col: column name for the value to aggregate
     - time_col: optional column name for time (str or datetime)
     - start_time: optional filter start time (string or numeric)
     - end_time: optional filter end time (string or numeric)
+    - agg_method: 'mean' (default) or 'sum'
 
     Returns:
-    - grouped average DataFrame or None if filtering results in no data
+    - grouped aggregated DataFrame or None if filtering results in no data
     """
 
     import pandas as pd
@@ -36,14 +121,24 @@ def filter_and_avg(df, county_id_col, value_col, time_col=None, start_time=None,
         if df_filtered.empty:
             print("❌ No data found in specified time range after filtering.")
             return None
-        df_avg = df.groupby(county_id_col)[value_col].mean().reset_index()
-        df_avg.rename(columns={value_col: value_col}, inplace=True)
-        return df_avg
     else:
-        print("No time range provided, averaging over entire dataset period...")
-        df_avg = df.groupby(county_id_col)[value_col].mean().reset_index()
-        df_avg.rename(columns={value_col: value_col}, inplace=True)
-        return df_avg
+        print("No time range provided, aggregating over entire dataset period...")
+        df_filtered = df
+
+    # Choose aggregation method
+    if agg_method == 'sum':
+        print("Aggregating using SUM...")
+        df_agg = df_filtered.groupby(county_id_col)[value_col].sum().reset_index()
+    elif agg_method == 'mean':
+        print("Aggregating using MEAN...")
+        df_agg = df_filtered.groupby(county_id_col)[value_col].mean().reset_index()
+    else:
+        print(f"❌ Invalid aggregation method '{agg_method}'. Use 'mean' or 'sum'.")
+        return None
+
+    df_agg.rename(columns={value_col: value_col}, inplace=True)
+    return df_agg
+
 
 def plot_county_data(
     shapefile_path,
@@ -51,6 +146,7 @@ def plot_county_data(
     county_data_path,
     county_id_col,
     value_col,
+    title,
     time_col=None,
     start_time=None,
     end_time=None,
@@ -58,6 +154,10 @@ def plot_county_data(
     vmax=None,
     crop_bounds=None,
     separate_files_by_year=False,
+    agg_method='mean',
+    show = True, 
+    ax = None,
+    crop_scale_pct = None,
 ):
     import geopandas as gpd
     import pandas as pd
@@ -129,7 +229,7 @@ def plot_county_data(
         return
 
     print("[4/6] Filtering and averaging data...")
-    avg_df = filter_and_avg(df, county_id_col, value_col, time_col, start_time, end_time)
+    avg_df = filter_and_avg(df, county_id_col, value_col, time_col, start_time, end_time, agg_method)
     if avg_df is None:
         return
 
@@ -138,8 +238,24 @@ def plot_county_data(
     avg_df[county_id_col] = avg_df[county_id_col].astype(int)
     merged = gdf.merge(avg_df, left_on=shapefile_id_col, right_on=county_id_col, how='left')
 
+    if crop_scale_pct is not None:
+        col_values = merged[value_col].dropna()
+        lower = col_values.quantile(crop_scale_pct / 100)
+        upper = col_values.quantile(1 - crop_scale_pct / 100)
+        limit = max(abs(lower), abs(upper))
+        vmin = -limit
+        vmax = limit
+    else:
+        if vmin is None and vmax is None:
+            col_values = merged[value_col].dropna()
+            vmax = col_values.abs().max()
+            vmin = -vmax
+
     print("[6/6] Plotting map...")
-    fig, ax = plt.subplots(figsize=(12, 8))
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(12, 8))
+
     merged.plot(
         column=value_col,
         cmap="coolwarm",
@@ -150,18 +266,22 @@ def plot_county_data(
         vmax=vmax,
         ax=ax
     )
-    ax.set_title(f"{value_col} by County")
+    ax.set_title(title)
     if crop_bounds:
         ax.set_xlim(crop_bounds[0], crop_bounds[1])
         ax.set_ylim(crop_bounds[2], crop_bounds[3])
 
     print("Done.")
-    plt.tight_layout()
-    plt.show()
+
+    if show and ax is None:
+        plt.tight_layout()
+        plt.show()
 
 def plot_county_diff(
     shapefile_path,
     shapefile_id_col,
+
+    title,
     
     # For dataset 1
     county_data_path_1=None,
@@ -319,7 +439,7 @@ def plot_county_diff(
     if df2_avg is None:
         return
 
-    print("[7/8] Calculating difference and merging with shapefile...")
+    print("[7/8] Calculating difference and merging with shapefile....")
 
     df1_avg_renamed = df1_avg.rename(columns={value_col1: 'value_1', county_id_col_1: 'county_id'})
     df2_avg_renamed = df2_avg.rename(columns={value_col2: 'value_2', county_id_col_2: 'county_id'})
@@ -331,7 +451,7 @@ def plot_county_diff(
     merged_df = pd.merge(df1_avg_renamed, df2_avg_renamed, on='county_id', how='outer')
 
     # Compute difference column safely (fill missing values if needed)
-    # merged_df['diff'] = merged_df['value_1'].fillna(0) - merged_df['value_2'].fillna(0)
+    merged_df['diff'] = merged_df['value_1'] - merged_df['value_2']
 
     # Now merge with GeoDataFrame
     gdf[shapefile_id_col] = gdf[shapefile_id_col].astype(int)
@@ -352,7 +472,7 @@ def plot_county_diff(
         vmax=vmax,
         ax=ax
     )
-    ax.set_title(f"Difference: {value_col1} - {value_col2} by County")
+    ax.set_title(title)
     if crop_bounds:
         ax.set_xlim(crop_bounds[0], crop_bounds[1])
         ax.set_ylim(crop_bounds[2], crop_bounds[3])

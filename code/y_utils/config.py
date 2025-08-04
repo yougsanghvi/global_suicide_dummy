@@ -138,4 +138,42 @@ def get_gdnat_agg_yearly(year: int, model: str) -> str:
     return os.path.join(GDNAT_USA_AGG_ALL_MODELS_FP, model, filename)
 
 # Project folder 
-PROJECT_FOLDER = os.path.join(CONDO_PATH, "global_suicide")
+PROJECT_FOLDER = os.path.join(CONDO_PATH, "projects", "global_suicide")
+
+# attribution output
+CURRENT_TREND_ATTR = os.path.join(
+    PROJECT_FOLDER, "merged_data_panel_extended_v3.csv")
+
+# combined filtered attribution output
+COMBINED_FILTERED_ATTR = os.path.join(
+    PROJECT_FOLDER, "results", "ACCESS-CM2", "attribution_output_filtered_ACCESS-CM2.csv")
+
+COMBINED_FULLSAMPLE_ATTR = os.path.join(
+    PROJECT_FOLDER, "results", "ACCESS-CM2", "attribution_output_fullsample_ACCESS-CM2.csv")
+
+def get_combined_fullsample_attr(model: str) -> str:
+    """
+    Returns the full path to the combined fullsample attribution output for a specific model.
+    Example: get_combined_fullsample_attr("ACCESS-CM2") -> ".../attribution_output_fullsample_ACCESS-CM2.csv"
+    """
+    return os.path.join(
+        PROJECT_FOLDER, "results", model, f"attribution_output_fullsample_{model}.csv"
+    )
+
+def get_combined_filtered_attr(model: str) -> str:
+    """
+    Returns the full path to the combined filtered attribution output for a specific model.
+    Example: get_combined_filtered_attr("ACCESS-CM2") -> ".../attribution_output_filtered_ACCESS-CM2.csv"
+    """
+    return os.path.join(
+        PROJECT_FOLDER, "results", model, f"attribution_output_filtered_{model}.csv"
+    )
+
+def get_attribution_output_fp(model: str) -> str:
+    """
+    Returns the full path to the attribution output for a specific model.
+    Example: get_attribution_output_fp("ACCESS-CM2") -> ".../attribution_output_ACCESS-CM2.csv"
+    """
+    return os.path.join(
+        PROJECT_FOLDER, "results", model, f"attribution_output_{model}.csv"
+    )

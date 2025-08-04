@@ -81,4 +81,8 @@ get_gdnat_agg_yearly <- function(year, model) {
 }
 
 # project folder
-PROJECT_FOLDER <- file.path(CONDO_PATH, "global_suicide")
+PROJECT_FOLDER <- file.path(CONDO_PATH, "projects", "global_suicide")
+
+# current trend attribution output
+CURRENT_TREND_ATTR <- file.path(
+    PROJECT_FOLDER, "merged_data_panel_extended_v3.csv")

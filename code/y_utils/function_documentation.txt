@@ -1,0 +1,151 @@
+==========================
+County-Level Data Processing and Visualization Functions
+==========================
+
+---
+
+Function: filter_and_avg
+-------------------------
+
+Description:
+    Filters a DataFrame by an optional time range and aggregates values per county using mean or sum.
+
+Signature:
+    filter_and_avg(df, county_id_col, value_col, time_col=None, start_time=None, end_time=None, agg_method='mean')
+
+Parameters:
+    - df (pd.DataFrame): The dataset containing county data.
+    - county_id_col (str): Name of the column identifying the county.
+    - value_col (str): Name of the column to aggregate.
+    - time_col (str, optional): Column representing time (e.g., 'year', 'date').
+    - start_time (str or numeric, optional): Start of the filtering period.
+    - end_time (str or numeric, optional): End of the filtering period.
+    - agg_method (str): Aggregation method, either 'mean' (default) or 'sum'.
+
+Returns:
+    - pd.DataFrame: Aggregated DataFrame grouped by `county_id_col`, or None if no data remains after filtering.
+
+---
+
+Function: plot_county_data
+--------------------------
+
+Description:
+    Plots a choropleth map of a selected value for each county by merging a geographic shapefile with county-level data.
+
+Signature:
+    plot_county_data(
+        shapefile_path,
+        shapefile_id_col,
+        county_data_path,
+        county_id_col,
+        value_col,
+        title,
+        time_col=None,
+        start_time=None,
+        end_time=None,
+        vmin=None,
+        vmax=None,
+        crop_bounds=None,
+        separate_files_by_year=False,
+        agg_method='mean',
+        show=True,
+        ax=None,
+        crop_scale_pct=None,
+    )
+
+Parameters:
+    - shapefile_path (str): Path to the shapefile for geographic boundaries.
+    - shapefile_id_col (str): Column in shapefile used as the county ID.
+    - county_data_path (str): CSV file path containing county-level data.
+    - county_id_col (str): County ID column name in county data.
+    - value_col (str): Name of the column to visualize.
+    - title (str): Title of the map.
+    - time_col (str, optional): Column used for filtering by time.
+    - start_time (str or numeric, optional): Start of time filter window.
+    - end_time (str or numeric, optional): End of time filter window.
+    - vmin (float, optional): Minimum value for color scale.
+    - vmax (float, optional): Maximum value for color scale.
+    - crop_bounds (list, optional): [x_min, x_max, y_min, y_max] to crop the map extent.
+    - separate_files_by_year (bool): If True, assumes data is split across yearly files.
+    - agg_method (str): Aggregation method—'mean' (default) or 'sum'.
+    - show (bool): Whether to show the plot with plt.show().
+    - ax (matplotlib axis, optional): Axis to draw the plot into.
+    - crop_scale_pct (float, optional): If given, vmin/vmax are computed based on symmetric percentile of absolute values.
+
+Returns:
+    - None. Displays a choropleth map.
+
+---
+
+Function: plot_county_diff
+--------------------------
+
+Description:
+    Plots the difference between two county-level datasets (value_col1 - value_col2) as a choropleth map.
+
+Signature:
+    plot_county_diff(
+        shapefile_path,
+        shapefile_id_col,
+        title,
+        county_data_path_1=None,
+        county_id_col_1=None,
+        value_col1=None,
+        separate_files_by_year_1=False,
+        yearly_raw_folder_1=None,
+        yearly_raw_template_1=None,
+        county_data_path_2=None,
+        county_id_col_2=None,
+        value_col2=None,
+        separate_files_by_year_2=False,
+        yearly_raw_folder_2=None,
+        yearly_raw_template_2=None,
+        years=None,
+        vmin=None,
+        vmax=None,
+        crop_bounds=None,
+        time_col=None,
+    )
+
+Parameters:
+    - shapefile_path (str): Path to the shapefile for geographic boundaries.
+    - shapefile_id_col (str): Column in shapefile used as the county ID.
+    - title (str): Title of the difference map.
+    
+    -- Dataset 1 parameters --
+    - county_data_path_1 (str): File path to the first dataset.
+    - county_id_col_1 (str): County ID column in the first dataset.
+    - value_col1 (str): Column to use for values in the first dataset.
+    - separate_files_by_year_1 (bool): Whether first dataset is stored per year.
+    - yearly_raw_folder_1 (str): Folder containing yearly files for dataset 1.
+    - yearly_raw_template_1 (str): Filename template for yearly files in dataset 1.
+    
+    -- Dataset 2 parameters --
+    - county_data_path_2 (str): File path to the second dataset.
+    - county_id_col_2 (str): County ID column in the second dataset.
+    - value_col2 (str): Column to use for values in the second dataset.
+    - separate_files_by_year_2 (bool): Whether second dataset is stored per year.
+    - yearly_raw_folder_2 (str): Folder containing yearly files for dataset 2.
+    - yearly_raw_template_2 (str): Filename template for yearly files in dataset 2.
+    
+    - years (list[int]): List of years to filter and aggregate over.
+    - vmin (float, optional): Minimum value for color scale.
+    - vmax (float, optional): Maximum value for color scale.
+    - crop_bounds (list, optional): [x_min, x_max, y_min, y_max] to crop the map.
+    - time_col (str, optional): Column used to filter both datasets by time.
+
+Returns:
+    - None. Displays a difference choropleth map.
+
+---
+
+Notes:
+------
+- All functions include print statements to trace execution steps.
+- Time filtering supports both datetime and numeric types.
+- County ID columns are coerced to `int` before merging for consistency.
+- All maps use a "coolwarm" colormap by default.
+- Functions handle missing data gracefully with outer merges.
+- `crop_scale_pct` helps dynamically define vmin/vmax from data percentiles.
+- Usage examples are recommended for end users (not included in this version).
