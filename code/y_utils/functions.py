@@ -1,7 +1,128 @@
 import pandas as pd
 
-import pandas as pd
+def filter_and_aggregate_merged(
+    df,
+    value_col,
+    group_by='time',             # 'time', 'county', or 'both'
+    county_id_col=None,
+    time_col=None,
+    start_time=None,
+    end_time=None,
+    agg_method='mean',           # 'mean' or 'sum'
+    pop_col=None
+):
+    """
+    Unified function to filter and aggregate a value column over time and/or county.
 
+    Parameters:
+    - df (pd.DataFrame): Input dataframe.
+    - value_col (str): Column containing the values to be aggregated.
+    - group_by (str): 'time', 'county', or 'both'.
+    - county_id_col (str, optional): Required if group_by includes 'county'.
+    - time_col (str, optional): Required if group_by includes 'time' or if time filtering is used.
+    - start_time, end_time (int or str, optional): Time window for filtering.
+    - agg_method (str): 'mean' or 'sum'.
+    - pop_col (str, optional): If specified, perform population-weighted mean using this column (only if agg_method='mean').
+
+    Returns:
+    - pd.DataFrame: Aggregated dataframe with mean or sum by specified grouping.
+    """
+
+    print(f"Running filter_and_aggregate_merged for value_col = '{value_col}' (agg_method = {agg_method}, pop_col = {pop_col}, group_by = {group_by})")
+
+    df = df.copy()
+
+    # Validate group_by
+    valid_groupings = ['time', 'county', 'both']
+    if group_by not in valid_groupings:
+        print(f"❌ Invalid group_by value '{group_by}'. Must be one of {valid_groupings}.")
+        return None
+
+    # Validate required columns
+    if 'time' in group_by and not time_col:
+        print("❌ 'time_col' must be specified when group_by includes 'time'.")
+        return None
+    if 'county' in group_by and not county_id_col:
+        print("❌ 'county_id_col' must be specified when group_by includes 'county'.")
+        return None
+
+    # Apply time filtering if applicable (regardless of grouping)
+    if time_col and (start_time is not None or end_time is not None):
+        print(f"Filtering data between {start_time} and {end_time} on column '{time_col}'...")
+        try:
+            df[time_col] = pd.to_datetime(df[time_col], errors='coerce')
+            start = pd.to_datetime(start_time) if start_time is not None else None
+            end = pd.to_datetime(end_time) if end_time is not None else None
+        except Exception:
+            try:
+                df[time_col] = pd.to_numeric(df[time_col], errors='coerce')
+                start = float(start_time) if start_time is not None else None
+                end = float(end_time) if end_time is not None else None
+            except Exception as e:
+                print(f"❌ Error parsing time columns or values: {e}")
+                return None
+
+        if start is not None:
+            df = df[df[time_col] >= start]
+        if end is not None:
+            df = df[df[time_col] <= end]
+
+        if df.empty:
+            print("❌ No data found in specified time range after filtering.")
+            return None
+    else:
+        print("No time filtering applied.")
+
+    # Determine grouping keys
+    group_keys = []
+    if group_by == 'time':
+        group_keys = [time_col]
+    elif group_by == 'county':
+        group_keys = [county_id_col]
+    elif group_by == 'both':
+        group_keys = [county_id_col, time_col]
+
+    # Handle aggregation
+    if pop_col:
+        if agg_method != 'mean':
+            print(f"❌ Invalid aggregation method '{agg_method}' with population weighting. Only 'mean' is supported.")
+            return None
+
+        before_drop = len(df)
+        df = df.dropna(subset=[value_col, pop_col])
+        after_drop = len(df)
+        print(f"Dropped {before_drop - after_drop} rows due to NA in {value_col} or {pop_col}")
+
+        df["weighted_value"] = df[value_col] * df[pop_col]
+
+        grouped = df.groupby(group_keys).agg(
+            weighted_sum=("weighted_value", "sum"),
+            weight=(pop_col, "sum")
+        ).reset_index()
+
+        grouped[value_col] = grouped["weighted_sum"] / grouped["weight"]
+        result = grouped[group_keys + [value_col]]
+
+    else:
+        before_drop = len(df)
+        df = df.dropna(subset=[value_col])
+        after_drop = len(df)
+        if before_drop - after_drop > 0:
+            print(f"Dropped {before_drop - after_drop} rows due to NA in {value_col}")
+
+        if agg_method == 'mean':
+            print("Aggregating using MEAN...")
+            result = df.groupby(group_keys)[value_col].mean().reset_index()
+        elif agg_method == 'sum':
+            print("Aggregating using SUM...")
+            result = df.groupby(group_keys)[value_col].sum().reset_index()
+        else:
+            print(f"❌ Invalid aggregation method '{agg_method}'. Use 'mean' or 'sum'.")
+            return None
+
+    return result
+
+# _year and _county versions need to be phased out eventually; use only the main function _merged 
 def filter_and_avg_by_year(df, county_id_col, value_col, time_col=None, start_time=None, end_time=None, agg_method='mean', pop_col=None):
     """
     Filters and aggregates a value column from a dataframe over time.

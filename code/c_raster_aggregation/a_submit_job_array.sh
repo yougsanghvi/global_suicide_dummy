@@ -35,7 +35,7 @@ echo "Node: $SLURM_NODELIST"
 
 # Run R script for specific year
 echo "Starting ERA5 aggregation for year $YEAR..."
-Rscript code/b_raster_aggregation/c_stagg_aggregation_loop_models_yearly_fillna.R $YEAR
+Rscript code/c_raster_aggregation/b_stagg_aggregation_loop_models_yearly_fillna.R $YEAR
 
 echo "The script for year $YEAR terminated at: $(date). Please check the error logs and output folder to verify successful completion."
 # End of script
