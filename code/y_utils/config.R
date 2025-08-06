@@ -18,7 +18,7 @@ SUICIDE_PROJECT_FOLDER <- file.path(SCRATCH, "data", "merged", "USA")
 SUICIDE_PANEL_FP <- file.path(SUICIDE_PROJECT_FOLDER, "USA_adm2_1968_2004_monthly.dta")
 
 # GDNAT aggregated
-STAGG_FOLDER_PATH <- file.path(SCRATCH, "aggregated_results_gdnat_usa")
+STAGG_FOLDER_PATH <- file.path(SCRATCH, "aggregated_results_era5_usa")
 GDNAT_COUNTY_FP <- file.path(STAGG_FOLDER_PATH, "gdnat_usa_agg_all_years.csv")
 
 get_gdnat_agg_yearly <- function(year) {
