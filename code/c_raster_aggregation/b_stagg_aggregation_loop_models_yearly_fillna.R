@@ -346,6 +346,7 @@ library(tictoc)
 library(remotes)
 library(stagg)
 library(pryr)
+library(tidyr)
 
 cat(crayon::green("All required packages loaded.\n"))
 
@@ -498,6 +499,23 @@ for (model_name in model_list) {
   print_memory("After stagg aggregation")
 
   temp_out$year <- year
-  write.csv(temp_out, output_filepath, row.names = FALSE)
+  temp_out <- temp_out %>% drop_na()
+  existing_data <- existing_data %>% drop_na()
+
+  # Add number of days per (year, month)
+  temp_out$num_days <- days_in_month(ymd(paste(temp_out$year, temp_out$month, "01", sep = "-")))
+
+  # Compute average from sum using correct number of days
+  for (deg in 1:4) {
+    sum_col <- paste0("order_", deg)
+    avg_col <- paste0("order_", deg, "_avg")
+    if (sum_col %in% colnames(temp_out)) {
+      temp_out[[avg_col]] <- temp_out[[sum_col]] / temp_out$num_days
+    }
+  }
+
+  df_combined <- rbind(existing_data, temp_out)
+
+  write.csv(df_combined, output_filepath, row.names = FALSE)
   cat(crayon::green(sprintf("Saved output: %s\n", output_filepath)))
 }

@@ -344,6 +344,7 @@ library(tictoc)
 library(remotes)
 library(stagg)
 library(pryr)
+library(tidyr)
 
 cat(crayon::green("All required packages loaded.\n"))
 
@@ -418,7 +419,7 @@ for (model_name in model_list) {
     filename_pattern <- "gdnat_%d.tif"
     dir_tiff <- file.path(GDNAT_TIFF_DIR, model_name)
     file_format_prefix <- paste0("gdnat_usa_agg_", model_name, "_")
-    output_dir <- file.path(GDNAT_DIR, "aggregated", "usa_pop_county", model_name)
+    output_dir <- file.path(GDNAT_USA_AGG_ALL_MODELS_FP, model_name)
     daily <- TRUE
   }
 
@@ -484,6 +485,20 @@ for (model_name in model_list) {
   print_memory("After stagg aggregation")
 
   temp_out$year <- year
+  temp_out <- temp_out %>% drop_na()
+
+  # Add number of days per (year, month)
+  temp_out$num_days <- days_in_month(ymd(paste(temp_out$year, temp_out$month, "01", sep = "-")))
+
+  # Compute average from sum using correct number of days
+  for (deg in 1:4) {
+    sum_col <- paste0("order_", deg)
+    avg_col <- paste0("order_", deg, "_avg")
+    if (sum_col %in% colnames(temp_out)) {
+      temp_out[[avg_col]] <- temp_out[[sum_col]] / temp_out$num_days
+    }
+  }
+
   write.csv(temp_out, output_filepath, row.names = FALSE)
   cat(crayon::green(sprintf("Saved output: %s\n", output_filepath)))
 }

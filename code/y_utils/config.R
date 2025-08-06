@@ -59,12 +59,14 @@ get_era5_daily_yearly <- function(year) {
 ERA5_COUNTY_AREA_FP <- file.path(SCRATCH, "data", "climatedata", "USA", "usa_area_era5_temp_average_1968_2004_polynomial_5_area_crop_weights.csv")
 
 
-# === ERA5 AGGREGATED PATHS ===
-ERA5_AGG_FOLDER <- file.path(SCRATCH, "aggregated_results_era5_usa")
 
 # === CONDO PATH ===
 CONDO_PATH <- "/global/scratch/projects/co_carleton/carleton_colab"
 CONDO_DATA_DIR <- file.path(CONDO_PATH, "data")
+
+
+# === ERA5 AGGREGATED PATHS ===
+ERA5_AGG_FOLDER <- file.path(CONDO_DATA_DIR, "era5_t2m","aggregated", "usa_pop_county")
 
 # === Raw GDNat Paths ===
 GDNAT_DIR <- file.path(CONDO_DATA_DIR, "gdnat_allmodels_Jul24")
@@ -74,7 +76,7 @@ GDNAT_DATA_FP <- file.path(GDNAT_DIR, "gdnat_tas_1979-2020_v2025-02-11.zarr")
 GDNAT_TIFF_OUTPUT_DIR <- file.path(GDNAT_DIR, "tiff_by_yr_model")
 
 # Aggregated GDNAT paths
-GDNAT_USA_AGG_ALL_MODELS_FP <- file.path(GDNAT_DIR, "aggregated", "usa_pop_county")
+GDNAT_USA_AGG_ALL_MODELS_FP <- file.path(GDNAT_DIR, "aggregated", "usa_pop_county_na_ignore")
 
 get_gdnat_agg_yearly <- function(year, model) {
   file.path(GDNAT_USA_AGG_ALL_MODELS_FP, model, sprintf("gdnat_usa_agg_%s_%d.csv", model, year))

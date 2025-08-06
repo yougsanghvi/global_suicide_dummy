@@ -4,7 +4,7 @@
 #SBATCH --partition=savio4_htc
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=20
+#SBATCH --cpus-per-task=40
 #SBATCH --time=40:00:00
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=yougsanghvi@berkeley.edu
@@ -35,7 +35,7 @@ echo "Node: $SLURM_NODELIST"
 
 # Run R script for specific year
 echo "Starting ERA5 aggregation for year $YEAR..."
-Rscript code/b_era5_aggregation/z_stagg_aggregation_loop_models_yearly.R $YEAR
+Rscript code/b_raster_aggregation/c_stagg_aggregation_loop_models_yearly_fillna.R $YEAR
 
 echo "The script for year $YEAR terminated at: $(date). Please check the error logs and output folder to verify successful completion."
 # End of script
