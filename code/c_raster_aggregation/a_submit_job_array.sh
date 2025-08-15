@@ -10,7 +10,7 @@
 #SBATCH --mail-user=yougsanghvi@berkeley.edu
 #SBATCH --output=slurm_logs/era5_agg_array_%A_%a.out
 #SBATCH --error=slurm_logs/era5_agg_array_%A_%a.err
-#SBATCH --array=0-50%2
+#SBATCH --array=0-30%3
 
 # This script processes years in parallel using SLURM job arrays
 # Array 0-5 represents 26 years (1979-2004)

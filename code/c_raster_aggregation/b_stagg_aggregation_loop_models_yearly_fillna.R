@@ -378,7 +378,7 @@ if (length(args) > 0) {
 }
 if (is.na(year) || year < 1979 || year > 2004) stop("Invalid year provided. Must be between 1979 and 2020.")
 
-overwrite <- FALSE
+overwrite <- TRUE
 pop_weight <- TRUE
 
 # Shapefile setup
@@ -398,10 +398,24 @@ if (!file.exists(current_data_path)) {
 existing_data <- read.csv(current_data_path)
 
 processed_counties <- unique(existing_data$poly_id_int)
-all_counties <- as.integer(usa_counties$GEOID)
+usa_counties$GEOID <- as.integer(usa_counties$GEOID)
+all_counties <- usa_counties$GEOID
 missing_counties <- setdiff(all_counties, processed_counties)
 
 usa_counties <- usa_counties[usa_counties$GEOID %in% missing_counties, ]
+
+
+# ---- debugging code, remove soon
+
+
+
+
+# ------ end of debugging code
+
+
+
+
+
 
 # Overlay weights
 cat(crayon::blue("Calculating overlay weights...\n"))
@@ -515,6 +529,8 @@ for (model_name in model_list) {
     }
   }
 
+  temp_out <- as.data.frame(temp_out)
+  temp_out$num_days <- NULL
   df_combined <- rbind(existing_data, temp_out)
 
   write.csv(df_combined, output_filepath, row.names = FALSE)

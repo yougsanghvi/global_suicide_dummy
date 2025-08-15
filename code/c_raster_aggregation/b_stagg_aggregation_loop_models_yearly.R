@@ -499,6 +499,8 @@ for (model_name in model_list) {
     }
   }
 
+  temp_out$num_days <- NULL
+
   write.csv(temp_out, output_filepath, row.names = FALSE)
   cat(crayon::green(sprintf("Saved output: %s\n", output_filepath)))
 }
